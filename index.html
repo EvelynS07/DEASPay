@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEASPay — Banco Digital</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rose: #f2608a;
+    --rose-deep: #e03d6e;
+    --rose-light: #fcd0e0;
+    --rose-pale: #ffe8f0;
+    --black: #0d0a0b;
+    --black-soft: #1a1318;
+    --charcoal: #2e2028;
+    --white: #ffffff;
+    --gray-soft: #f8f5f6;
+    --gray-mid: #c8b8bc;
+    --success: #4caf7d;
+    --danger: #e05c6e;
+    --warning: #f0a44a;
+    --gradient-hero: linear-gradient(135deg, #080508 0%, #1c0d16 25%, #4a1030 55%, #a8204e 80%, #f2608a 100%);
+    --gradient-card: linear-gradient(135deg, rgba(244,165,184,0.12) 0%, rgba(255,255,255,0.04) 100%);
+    --gradient-btn: linear-gradient(135deg, #c42d5a 0%, #e03d6e 50%, #f4a5b8 100%);
+    --shadow-glow: 0 0 50px rgba(242,96,138,0.4);
+    --shadow-card: 0 8px 32px rgba(13,10,11,0.18);
+    --radius: 20px;
+    --radius-sm: 12px;
+    --transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--black);
+    color: var(--white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ===== AUTH SCREENS ===== */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-bg {
+    position: absolute; inset: 0;
+    background: var(--gradient-hero);
+    z-index: 0;
+  }
+
+  .auth-noise {
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    z-index: 1; opacity: 0.4;
+  }
+
+  .auth-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 1;
+  }
+  .orb-1 { width: 500px; height: 500px; background: rgba(244,165,184,0.18); top: -100px; right: -100px; }
+  .orb-2 { width: 350px; height: 350px; background: rgba(92,34,53,0.5); bottom: -80px; left: -80px; }
+  .orb-3 { width: 200px; height: 200px; background: rgba(244,165,184,0.1); top: 50%; left: 30%; }
+
+  .auth-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .auth-right {
+    width: 460px;
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(24px);
+    border-left: 1px solid rgba(244,165,184,0.15);
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    position: relative;
+    z-index: 2;
+    overflow-y: auto;
+    height: 100vh;
+  }
+
+  .brand-logo {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 60px;
+  }
+  .brand-icon {
+    width: 44px; height: 44px;
+    background: var(--gradient-btn);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .brand-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 28px; font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .brand-name span { color: var(--rose); }
+
+  .hero-text h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(42px, 5vw, 72px);
+    font-weight: 300;
+    line-height: 1.1;
+    margin-bottom: 20px;
+  }
+  .hero-text h1 em { color: var(--rose); font-style: italic; }
+  .hero-text p {
+    font-size: 16px; color: var(--gray-mid);
+    line-height: 1.7; max-width: 400px;
+  }
+
+  .hero-badges {
+    display: flex; gap: 12px; margin-top: 40px; flex-wrap: wrap;
+  }
+  .badge {
+    padding: 8px 16px;
+    border: 1px solid rgba(244,165,184,0.3);
+    border-radius: 50px;
+    font-size: 12px; color: var(--rose);
+    letter-spacing: 0.5px;
+  }
+
+  /* FORM PANEL */
+  .auth-tabs {
+    display: flex; gap: 0;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .auth-tab {
+    flex: 1; padding: 10px;
+    background: none; border: none;
+    border-radius: 10px;
+    color: var(--gray-mid);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: var(--transition);
+  }
+  .auth-tab.active {
+    background: var(--gradient-btn);
+    color: var(--white);
+  }
+
+  .form-panel { display: none; }
+  .form-panel.active { display: block; }
+
+  .form-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px; font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .form-subtitle { font-size: 13px; color: var(--gray-mid); margin-bottom: 18px; }
+
+  .field-group { margin-bottom: 12px; }
+  .field-row { display: flex; gap: 12px; }
+  .field-row .field-group { flex: 1; }
+
+  .field-group label {
+    display: block; font-size: 11px;
+    font-weight: 600; letter-spacing: 0.8px;
+    text-transform: uppercase; color: var(--rose);
+    margin-bottom: 6px;
+  }
+
+  .field-group input,
+  .field-group select,
+  .field-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(244,165,184,0.2);
+    border-radius: var(--radius-sm);
+    color: var(--white);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    transition: var(--transition);
+    outline: none;
+  }
+  .field-group input:focus,
+  .field-group select:focus {
+    border-color: var(--rose);
+    background: rgba(244,165,184,0.08);
+    box-shadow: 0 0 0 3px rgba(244,165,184,0.1);
+  }
+  .field-group select { cursor: pointer; }
+  .field-group select option { background: var(--charcoal); }
+
+  .field-group input::placeholder { color: rgba(200,184,188,0.5); }
+
+  .btn-primary {
+    width: 100%; padding: 15px;
+    background: var(--gradient-btn);
+    border: none; border-radius: var(--radius-sm);
+    color: var(--white);
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: var(--transition);
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+  }
+  .btn-primary:active { transform: translateY(0); }
+
+  .divider {
+    text-align: center; position: relative; margin: 14px 0;
+    color: var(--gray-mid); font-size: 12px;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    position: absolute; top: 50%;
+    width: 40%; height: 1px;
+    background: rgba(244,165,184,0.15);
+  }
+  .divider::before { left: 0; }
+  .divider::after { right: 0; }
+
+  .btn-outline {
+    width: 100%; padding: 13px;
+    background: none;
+    border: 1px solid rgba(244,165,184,0.3);
+    border-radius: var(--radius-sm);
+    color: var(--rose);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px; cursor: pointer;
+    transition: var(--transition);
+  }
+  .btn-outline:hover {
+    background: rgba(244,165,184,0.08);
+    border-color: var(--rose);
+  }
+
+  .open-finance-tag {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(76,175,125,0.1);
+    border: 1px solid rgba(76,175,125,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-size: 12px; color: #4caf7d;
+  }
+
+  /* ===== DASHBOARD ===== */
+  #dashboard {
+    display: none;
+    min-height: 100vh;
+    background: var(--gray-soft);
+  }
+
+  /* Sidebar */
+  .sidebar {
+    position: fixed; left: 0; top: 0;
+    width: 230px; height: 100vh;
+    background: var(--black-soft);
+    border-right: 1px solid rgba(244,165,184,0.1);
+    display: flex; flex-direction: column;
+    z-index: 100;
+    padding: 0;
+    transition: var(--transition);
+    overflow: hidden;
+  }
+
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(244,165,184,0.1);
+    flex-shrink: 0;
+  }
+  .sidebar-icon {
+    width: 32px; height: 32px;
+    background: var(--gradient-btn);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .sidebar-brand-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 600;
+  }
+  .sidebar-brand-name span { color: var(--rose); }
+
+  /* Scrollable nav area */
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 0;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .nav-section { margin-bottom: 4px; }
+  .nav-label {
+    padding: 8px 20px 4px;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: rgba(200,184,188,0.35);
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 20px;
+    cursor: pointer; transition: var(--transition);
+    color: var(--gray-mid);
+    font-size: 13px; font-weight: 500;
+    border-left: 3px solid transparent;
+    margin: 1px 0;
+    text-decoration: none;
+  }
+  .nav-item:hover {
+    color: var(--white);
+    background: rgba(244,165,184,0.06);
+  }
+  .nav-item.active {
+    color: var(--rose);
+    background: rgba(244,165,184,0.1);
+    border-left-color: var(--rose);
+  }
+  .nav-item .nav-ico { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+  .sidebar-footer {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(244,165,184,0.1);
+  }
+  .user-card {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px;
+    background: rgba(244,165,184,0.08);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .user-avatar {
+    width: 34px; height: 34px;
+    background: var(--gradient-btn);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700;
+    color: var(--white); flex-shrink: 0;
+  }
+  .user-info-small { flex: 1; overflow: hidden; min-width: 0; }
+  .user-name-small { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-plan { font-size: 10px; color: var(--rose); }
+
+  /* Main */
+  .main-content {
+    margin-left: 230px;
+    min-height: 100vh;
+    background: #f5f0f2;
+    color: var(--black);
+  }
+
+  .topbar {
+    background: var(--white);
+    padding: 18px 36px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(13,10,11,0.06);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-title { font-size: 20px; font-weight: 700; color: var(--black); }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .topbar-notif {
+    width: 38px; height: 38px;
+    background: var(--rose-pale);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 18px;
+    position: relative;
+  }
+  .notif-dot {
+    position: absolute; top: 6px; right: 6px;
+    width: 8px; height: 8px;
+    background: var(--danger);
+    border-radius: 50%;
+    border: 2px solid var(--white);
+  }
+
+  .page-content {
+    padding: 32px 36px;
+  }
+
+  /* Score card */
+  .score-hero {
+    background: var(--gradient-hero);
+    border-radius: var(--radius);
+    padding: 36px 40px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: center;
+    margin-bottom: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .score-hero::after {
+    content: '';
+    position: absolute;
+    right: -60px; top: -60px;
+    width: 250px; height: 250px;
+    background: rgba(244,165,184,0.12);
+    border-radius: 50%;
+  }
+  .score-hero-label {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--rose); margin-bottom: 8px;
+  }
+  .score-hero-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px; font-weight: 400;
+    color: var(--white); margin-bottom: 4px;
+  }
+  .score-hero-desc { font-size: 13px; color: var(--gray-mid); }
+
+  .score-ring {
+    width: 130px; height: 130px;
+    position: relative; z-index: 1;
+    flex-shrink: 0;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring-value {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .score-ring-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px; font-weight: 600;
+    color: var(--white); line-height: 1;
+  }
+  .score-ring-label { font-size: 11px; color: var(--rose); margin-top: 2px; }
+
+  /* Cards grid */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  .info-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    border: 1px solid rgba(13,10,11,0.06);
+    transition: var(--transition);
+  }
+  .info-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(13,10,11,0.1);
+  }
+  .card-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 16px;
+  }
+  .card-icon.pink { background: var(--rose-light); }
+  .card-icon.green { background: rgba(76,175,125,0.12); }
+  .card-icon.red { background: rgba(224,92,110,0.12); }
+  .card-icon.orange { background: rgba(240,164,74,0.12); }
+  .card-label { font-size: 12px; color: #888; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card-value { font-size: 26px; font-weight: 700; color: var(--black); margin-top: 4px; line-height: 1; }
+  .card-value.green { color: var(--success); }
+  .card-value.red { color: var(--danger); }
+  .card-sub { font-size: 12px; color: #aaa; margin-top: 6px; }
+
+  /* Two col */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 28px; }
+  .full-col { grid-column: 1 / -1; }
+
+  .panel {
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 1px solid rgba(13,10,11,0.06);
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 20px 24px 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-title { font-size: 16px; font-weight: 700; color: var(--black); }
+  .panel-badge {
+    font-size: 11px; padding: 4px 10px;
+    border-radius: 50px; font-weight: 600;
+  }
+  .badge-danger { background: rgba(224,92,110,0.1); color: var(--danger); }
+  .badge-success { background: rgba(76,175,125,0.1); color: var(--success); }
+  .badge-warning { background: rgba(240,164,74,0.1); color: var(--warning); }
+
+  .panel-body { padding: 20px 24px; }
+
+  /* Inadimplency list */
+  .debt-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(13,10,11,0.06);
+    transition: var(--transition);
+  }
+  .debt-item:last-child { border-bottom: none; }
+  .debt-icon {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .debt-info { flex: 1; }
+  .debt-name { font-size: 14px; font-weight: 600; color: var(--black); }
+  .debt-date { font-size: 12px; color: #aaa; margin-top: 2px; }
+  .debt-amount { font-size: 15px; font-weight: 700; }
+  .debt-status {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 50px;
+  }
+  .status-overdue { background: rgba(224,92,110,0.12); color: var(--danger); }
+  .status-pending { background: rgba(240,164,74,0.12); color: var(--warning); }
+  .status-ok { background: rgba(76,175,125,0.12); color: var(--success); }
+
+  /* Score breakdown */
+  .score-bar-item { margin-bottom: 16px; }
+  .score-bar-top {
+    display: flex; justify-content: space-between;
+    font-size: 13px; margin-bottom: 6px;
+    color: var(--black);
+  }
+  .score-bar-track {
+    height: 8px; background: #f0e8ea;
+    border-radius: 50px; overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%; border-radius: 50px;
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* Open Finance */
+  .openf-list { display: flex; flex-direction: column; gap: 12px; }
+  .openf-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px;
+    background: var(--gray-soft);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(13,10,11,0.06);
+  }
+  .openf-logo {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: var(--white);
+    border: 1px solid rgba(13,10,11,0.08);
+    flex-shrink: 0;
+  }
+  .openf-name { font-size: 14px; font-weight: 600; color: var(--black); }
+  .openf-status { font-size: 12px; color: #aaa; }
+  .openf-toggle {
+    margin-left: auto;
+    width: 40px; height: 22px;
+    background: var(--gray-mid);
+    border-radius: 50px;
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .openf-toggle.on { background: var(--success); }
+  .openf-toggle::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    background: var(--white);
+    border-radius: 50%;
+    top: 3px; left: 3px;
+    transition: var(--transition);
+  }
+  .openf-toggle.on::after { left: calc(100% - 19px); }
+
+  /* Transaction list */
+  .tx-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(13,10,11,0.05);
+  }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+  }
+  .tx-info { flex: 1; }
+  .tx-name { font-size: 14px; font-weight: 600; color: var(--black); }
+  .tx-date { font-size: 12px; color: #aaa; }
+  .tx-amount { font-weight: 700; font-size: 14px; }
+  .tx-amount.credit { color: var(--success); }
+  .tx-amount.debit { color: var(--danger); }
+
+  /* Mobile menu */
+  .menu-toggle {
+    display: none;
+    background: none; border: none;
+    color: var(--black); font-size: 24px;
+    cursor: pointer; padding: 4px;
+  }
+
+  .hamburger { display: none; }
+
+  /* Score gauge */
+  .gauge-labels {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: #aaa;
+    margin-top: 6px;
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .auth-left { display: none; }
+    .auth-right { width: 100%; padding: 40px 28px; }
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main-content { margin-left: 0; }
+    .hamburger {
+      display: flex; align-items: center;
+      background: none; border: none;
+      font-size: 22px; cursor: pointer;
+      color: var(--black);
+    }
+    .two-col { grid-template-columns: 1fr; }
+    .score-hero { grid-template-columns: 1fr; text-align: center; }
+    .score-ring { margin: 0 auto; }
+    .page-content { padding: 24px 20px; }
+    .topbar { padding: 16px 20px; }
+  }
+
+  @media (max-width: 500px) {
+    .cards-grid { grid-template-columns: 1fr 1fr; }
+    .field-row { flex-direction: column; }
+  }
+
+  /* Animations */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-up {
+    animation: fadeInUp 0.6s cubic-bezier(0.4,0,0.2,1) both;
+  }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+
+  /* Overlay */
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .sidebar-overlay.show { display: block; }
+
+  /* Section pages */
+  .section-page { display: none; }
+  .section-page.active { display: block; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: #aaa;
+  }
+  .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* Progress ring animation */
+  .ring-animated { animation: ringDraw 1.5s cubic-bezier(0.4,0,0.2,1) forwards; }
+
+  /* Tag open finance */
+  .openf-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(76,175,125,0.12);
+    border: 1px solid rgba(76,175,125,0.3);
+    border-radius: 50px;
+    padding: 4px 12px;
+    font-size: 11px; color: var(--success);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== AUTH SCREEN ===== -->
+<div id="auth-screen">
+  <div class="auth-bg"></div>
+  <div class="auth-noise"></div>
+  <div class="auth-orb orb-1"></div>
+  <div class="auth-orb orb-2"></div>
+  <div class="auth-orb orb-3"></div>
+
+  <div class="auth-left">
+    <div class="brand-logo">
+      <div class="brand-icon">💳</div>
+      <div class="brand-name">DEAS<span>Pay</span></div>
+    </div>
+    <div class="hero-text">
+      <h1>Seu dinheiro,<br><em>inteligente</em><br>& conectado.</h1>
+      <p>Banco digital com Open Finance integrado. Monitore score, inadimplências e compartilhe dados com segurança entre instituições.</p>
+    </div>
+    <div class="hero-badges">
+      <span class="badge">🔒 Open Finance</span>
+      <span class="badge">📊 Score em tempo real</span>
+      <span class="badge">🏦 Multi-banco</span>
+      <span class="badge">🛡️ Bacen Regulado</span>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Entrar</button>
+      <button class="auth-tab" onclick="switchTab('register')">Cadastrar</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="login-panel" class="form-panel active">
+      <div class="form-title">Bem-vindo de volta</div>
+      <div class="form-subtitle">Acesse sua conta com segurança</div>
+
+      <div class="field-group">
+        <label>E-mail ou CPF</label>
+        <input type="text" id="login-email" placeholder="seuemail@exemplo.com" />
+      </div>
+      <div class="field-group">
+        <label>Senha</label>
+        <input type="password" id="login-pass" placeholder="••••••••" />
+      </div>
+      <button class="btn-primary" onclick="doLogin()">Entrar na conta</button>
+      <div class="divider">ou continue com</div>
+      <button class="btn-outline" onclick="doLogin()">🏛️ Entrar via Gov.br</button>
+      <div class="open-finance-tag">
+        <span>🔗</span>
+        <span>Conectado ao Open Finance Brasil — seus dados protegidos pelo Bacen</span>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="register-panel" class="form-panel">
+      <div class="form-title">Criar conta</div>
+      <div class="form-subtitle">Preencha seus dados para começar</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Nome</label>
+          <input type="text" id="reg-name" placeholder="Nome" />
+        </div>
+        <div class="field-group">
+          <label>Sobrenome</label>
+          <input type="text" id="reg-lname" placeholder="Sobrenome" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>CPF</label>
+          <input type="text" id="reg-cpf" placeholder="000.000.000-00" maxlength="14" oninput="maskCPF(this)" />
+        </div>
+        <div class="field-group">
+          <label>Data de Nascimento</label>
+          <input type="date" id="reg-birth" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>E-mail</label>
+        <input type="email" id="reg-email" placeholder="seuemail@exemplo.com" />
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Telefone</label>
+          <input type="text" id="reg-phone" placeholder="(00) 00000-0000" maxlength="15" oninput="maskPhone(this)" />
+        </div>
+        <div class="field-group">
+          <label>Sexo</label>
+          <select id="reg-gender">
+            <option value="">Selecionar</option>
+            <option>Masculino</option>
+            <option>Feminino</option>
+            <option>Não-binário</option>
+            <option>Prefiro não dizer</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>CEP</label>
+          <input type="text" id="reg-cep" placeholder="00000-000" maxlength="9" oninput="maskCEP(this)" />
+        </div>
+        <div class="field-group">
+          <label>Estado</label>
+          <select id="reg-state">
+            <option value="">UF</option>
+            <option>AC</option><option>AL</option><option>AM</option><option>AP</option>
+            <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+            <option>GO</option><option>MA</option><option>MG</option><option>MS</option>
+            <option>MT</option><option>PA</option><option>PB</option><option>PE</option>
+            <option>PI</option><option>PR</option><option>RJ</option><option>RN</option>
+            <option>RO</option><option>RR</option><option>RS</option><option>SC</option>
+            <option>SE</option><option>SP</option><option>TO</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Endereço completo</label>
+        <input type="text" id="reg-addr" placeholder="Rua, número, bairro, cidade" />
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Renda mensal</label>
+          <select id="reg-income">
+            <option value="">Selecionar</option>
+            <option>Até R$ 1.500</option>
+            <option>R$ 1.500 – R$ 3.000</option>
+            <option>R$ 3.000 – R$ 7.000</option>
+            <option>R$ 7.000 – R$ 15.000</option>
+            <option>Acima de R$ 15.000</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Ocupação</label>
+          <select id="reg-job">
+            <option value="">Selecionar</option>
+            <option>CLT</option>
+            <option>Autônomo / MEI</option>
+            <option>Empresário</option>
+            <option>Servidor Público</option>
+            <option>Aposentado</option>
+            <option>Estudante</option>
+            <option>Desempregado</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>Senha</label>
+        <input type="password" id="reg-pass" placeholder="Mínimo 8 caracteres" />
+      </div>
+      <div class="field-group">
+        <label>Confirmar senha</label>
+        <input type="password" id="reg-pass2" placeholder="Repita a senha" />
+      </div>
+
+      <button class="btn-primary" onclick="doRegister()">Criar minha conta</button>
+      <div class="open-finance-tag" style="margin-top:12px;">
+        <span>✅</span>
+        <span>Ao criar conta você consente com o compartilhamento via Open Finance</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="dashboard">
+  <div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-icon">💳</div>
+      <div class="sidebar-brand-name">DEAS<span>Pay</span></div>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-label">Principal</div>
+        <a class="nav-item active" onclick="showPage('home', this)">
+          <span class="nav-ico">🏠</span> Início
+        </a>
+        <a class="nav-item" onclick="showPage('score', this)">
+          <span class="nav-ico">📊</span> Meu Score
+        </a>
+        <a class="nav-item" onclick="showPage('debts', this)">
+          <span class="nav-ico">⚠️</span> Inadimplências
+        </a>
+        <a class="nav-item" onclick="showPage('transactions', this)">
+          <span class="nav-ico">💸</span> Extrato
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Conectividade</div>
+        <a class="nav-item" onclick="showPage('openfinance', this)">
+          <span class="nav-ico">🔗</span> Open Finance
+        </a>
+        <a class="nav-item" onclick="showPage('banks', this)">
+          <span class="nav-ico">🏦</span> Bancos Vinculados
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Conta</div>
+        <a class="nav-item" onclick="showPage('profile', this)">
+          <span class="nav-ico">👤</span> Perfil
+        </a>
+        <a class="nav-item" onclick="doLogout()">
+          <span class="nav-ico">🚪</span> Sair
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-card" onclick="showPage('profile', null)">
+        <div class="user-avatar" id="sidebar-avatar">A</div>
+        <div class="user-info-small">
+          <div class="user-name-small" id="sidebar-name">Usuário</div>
+          <div class="user-plan">Conta Premium</div>
+        </div>
+        <span style="color:#aaa;font-size:18px;">›</span>
+      </div>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="hamburger" onclick="toggleSidebar()">☰</button>
+        <div class="topbar-title" id="page-title">Início</div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-notif">🔔<span class="notif-dot"></span></div>
+        <div class="openf-chip">🔗 Open Finance Ativo</div>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- HOME PAGE -->
+      <div id="page-home" class="section-page active">
+
+        <div class="score-hero animate-up">
+          <div>
+            <div class="score-hero-label">Score de Crédito</div>
+            <div class="score-hero-name" id="dash-greeting">Olá, Usuário 👋</div>
+            <div class="score-hero-desc">Seu perfil financeiro está sendo monitorado em tempo real via Open Finance.</div>
+            <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+              <span style="background:rgba(244,165,184,0.2);color:#f4a5b8;padding:6px 14px;border-radius:50px;font-size:12px;font-weight:600;">✅ CPF Regularizado</span>
+              <span style="background:rgba(240,164,74,0.15);color:#f0a44a;padding:6px 14px;border-radius:50px;font-size:12px;font-weight:600;">⚠️ 2 Inadimplências</span>
+            </div>
+          </div>
+          <div class="score-ring" id="score-ring-home">
+            <svg width="130" height="130" viewBox="0 0 130 130">
+              <circle cx="65" cy="65" r="54" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+              <circle id="score-arc-home" cx="65" cy="65" r="54" fill="none" stroke="#f4a5b8" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+            </svg>
+            <div class="score-ring-value">
+              <div class="score-ring-num" id="score-num-home">0</div>
+              <div class="score-ring-label">/ 1000</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cards-grid animate-up delay-1">
+          <div class="info-card">
+            <div class="card-icon green">💰</div>
+            <div class="card-label">Saldo Disponível</div>
+            <div class="card-value">R$ 4.820<span style="font-size:16px;color:#aaa;">,50</span></div>
+            <div class="card-sub">Atualizado agora</div>
+          </div>
+          <div class="info-card">
+            <div class="card-icon pink">💳</div>
+            <div class="card-label">Crédito Disponível</div>
+            <div class="card-value" style="color:var(--rose-deep);">R$ 7.200</div>
+            <div class="card-sub">Limite total: R$ 12.000</div>
+          </div>
+          <div class="info-card">
+            <div class="card-icon red">⚠️</div>
+            <div class="card-label">Total em Dívidas</div>
+            <div class="card-value red">R$ 3.450</div>
+            <div class="card-sub">2 contas em atraso</div>
+          </div>
+          <div class="info-card">
+            <div class="card-icon orange">📅</div>
+            <div class="card-label">Próximo Vencimento</div>
+            <div class="card-value" style="font-size:18px;">15/05/2026</div>
+            <div class="card-sub">Fatura cartão — R$ 890</div>
+          </div>
+        </div>
+
+        <div class="two-col animate-up delay-2">
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Inadimplências Recentes</div>
+              <span class="panel-badge badge-danger">2 pendentes</span>
+            </div>
+            <div class="panel-body">
+              <div class="debt-item">
+                <div class="debt-icon" style="background:rgba(224,92,110,0.1);">🏥</div>
+                <div class="debt-info">
+                  <div class="debt-name">Clínica São Lucas</div>
+                  <div class="debt-date">Venceu em 10/03/2026 — 58 dias</div>
+                </div>
+                <div>
+                  <div class="debt-amount" style="color:var(--danger);">R$ 1.200</div>
+                  <div class="debt-status status-overdue">Vencida</div>
+                </div>
+              </div>
+              <div class="debt-item">
+                <div class="debt-icon" style="background:rgba(240,164,74,0.1);">📱</div>
+                <div class="debt-info">
+                  <div class="debt-name">Operadora Vivo</div>
+                  <div class="debt-date">Venceu em 01/04/2026 — 36 dias</div>
+                </div>
+                <div>
+                  <div class="debt-amount" style="color:var(--warning);">R$ 340</div>
+                  <div class="debt-status status-pending">Em atraso</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">Open Finance Conectado</div>
+              <span class="panel-badge badge-success">3 bancos</span>
+            </div>
+            <div class="panel-body">
+              <div class="openf-list">
+                <div class="openf-item">
+                  <div class="openf-logo">🏦</div>
+                  <div>
+                    <div class="openf-name">Banco do Brasil</div>
+                    <div class="openf-status">Conta corrente compartilhada</div>
+                  </div>
+                  <div class="openf-toggle on" onclick="this.classList.toggle('on')"></div>
+                </div>
+                <div class="openf-item">
+                  <div class="openf-logo">🟠</div>
+                  <div>
+                    <div class="openf-name">Itaú Unibanco</div>
+                    <div class="openf-status">Dados de crédito</div>
+                  </div>
+                  <div class="openf-toggle on" onclick="this.classList.toggle('on')"></div>
+                </div>
+                <div class="openf-item">
+                  <div class="openf-logo">💚</div>
+                  <div>
+                    <div class="openf-name">Nubank</div>
+                    <div class="openf-status">Cartão e extrato</div>
+                  </div>
+                  <div class="openf-toggle" onclick="this.classList.toggle('on')"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel animate-up delay-3">
+          <div class="panel-header">
+            <div class="panel-title">Últimas Transações</div>
+            <span style="font-size:13px;color:var(--rose);cursor:pointer;" onclick="showPage('transactions', null)">Ver tudo →</span>
+          </div>
+          <div class="panel-body" id="tx-list-home"></div>
+        </div>
+      </div>
+
+      <!-- SCORE PAGE -->
+      <div id="page-score" class="section-page">
+        <div class="score-hero" style="margin-bottom:28px;">
+          <div>
+            <div class="score-hero-label">Análise de Score</div>
+            <div class="score-hero-name">Score Detalhado</div>
+            <div class="score-hero-desc">Veja os fatores que impactam seu score de crédito e como melhorá-lo.</div>
+          </div>
+          <div class="score-ring">
+            <svg width="130" height="130" viewBox="0 0 130 130">
+              <circle cx="65" cy="65" r="54" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+              <circle id="score-arc-detail" cx="65" cy="65" r="54" fill="none" stroke="#f4a5b8" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+            </svg>
+            <div class="score-ring-value">
+              <div class="score-ring-num" id="score-num-detail">0</div>
+              <div class="score-ring-label">/ 1000</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Fatores do Score</div></div>
+            <div class="panel-body">
+              <div class="score-bar-item">
+                <div class="score-bar-top"><span>Histórico de pagamentos</span><span style="color:var(--danger);font-weight:600;">Ruim (38%)</span></div>
+                <div class="score-bar-track"><div class="score-bar-fill" style="width:38%;background:var(--danger);"></div></div>
+              </div>
+              <div class="score-bar-item">
+                <div class="score-bar-top"><span>Uso do crédito disponível</span><span style="color:var(--warning);font-weight:600;">Regular (60%)</span></div>
+                <div class="score-bar-track"><div class="score-bar-fill" style="width:60%;background:var(--warning);"></div></div>
+              </div>
+              <div class="score-bar-item">
+                <div class="score-bar-top"><span>Tempo de relacionamento</span><span style="color:var(--success);font-weight:600;">Bom (75%)</span></div>
+                <div class="score-bar-track"><div class="score-bar-fill" style="width:75%;background:var(--success);"></div></div>
+              </div>
+              <div class="score-bar-item">
+                <div class="score-bar-top"><span>Diversidade de crédito</span><span style="color:var(--success);font-weight:600;">Bom (70%)</span></div>
+                <div class="score-bar-track"><div class="score-bar-fill" style="width:70%;background:var(--success);"></div></div>
+              </div>
+              <div class="score-bar-item">
+                <div class="score-bar-top"><span>Novas consultas de crédito</span><span style="color:var(--warning);font-weight:600;">Regular (55%)</span></div>
+                <div class="score-bar-track"><div class="score-bar-fill" style="width:55%;background:var(--warning);"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header"><div class="panel-title">Como melhorar seu score</div></div>
+            <div class="panel-body">
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                  <div style="width:36px;height:36px;background:rgba(224,92,110,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🚨</div>
+                  <div>
+                    <div style="font-size:14px;font-weight:600;color:var(--black);">Quite dívidas em atraso</div>
+                    <div style="font-size:12px;color:#888;margin-top:2px;">Pague a Clínica São Lucas (R$1.200) e Vivo (R$340) para +120 pontos</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                  <div style="width:36px;height:36px;background:rgba(240,164,74,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">💳</div>
+                  <div>
+                    <div style="font-size:14px;font-weight:600;color:var(--black);">Reduza uso do cartão</div>
+                    <div style="font-size:12px;color:#888;margin-top:2px;">Mantenha o uso abaixo de 30% do limite para +60 pontos</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                  <div style="width:36px;height:36px;background:rgba(76,175,125,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📅</div>
+                  <div>
+                    <div style="font-size:14px;font-weight:600;color:var(--black);">Pague contas em dia</div>
+                    <div style="font-size:12px;color:#888;margin-top:2px;">3 meses sem atraso pode agregar +80 pontos ao score</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;align-items:flex-start;">
+                  <div style="width:36px;height:36px;background:rgba(244,165,184,0.15);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🔗</div>
+                  <div>
+                    <div style="font-size:14px;font-weight:600;color:var(--black);">Ative Open Finance</div>
+                    <div style="font-size:12px;color:#888;margin-top:2px;">Compartilhe dados com mais instituições para +40 pontos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:0;">
+          <div class="panel-header"><div class="panel-title">Classificação do Score</div></div>
+          <div class="panel-body">
+            <div style="display:flex;gap:0;border-radius:12px;overflow:hidden;margin-bottom:12px;">
+              <div style="flex:1;background:#e05c6e;padding:10px;text-align:center;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;">MUITO BAIXO</div>
+                <div style="font-size:12px;color:white;font-weight:700;">0–300</div>
+              </div>
+              <div style="flex:1;background:#f0a44a;padding:10px;text-align:center;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;">BAIXO</div>
+                <div style="font-size:12px;color:white;font-weight:700;">301–500</div>
+              </div>
+              <div style="flex:1;background:#f4a5b8;padding:10px;text-align:center;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.8);font-weight:600;">REGULAR</div>
+                <div style="font-size:12px;color:white;font-weight:700;">501–700</div>
+              </div>
+              <div style="flex:1;background:#4caf7d;padding:10px;text-align:center;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;">BOM</div>
+                <div style="font-size:12px;color:white;font-weight:700;">701–850</div>
+              </div>
+              <div style="flex:1;background:#2e7d5a;padding:10px;text-align:center;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.7);font-weight:600;">EXCELENTE</div>
+                <div style="font-size:12px;color:white;font-weight:700;">851–1000</div>
+              </div>
+            </div>
+            <div style="font-size:13px;color:#888;text-align:center;">Seu score atual: <strong style="color:var(--rose-deep);">582 — Regular</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DEBTS PAGE -->
+      <div id="page-debts" class="section-page">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+          <div>
+            <div style="font-size:22px;font-weight:700;color:var(--black);">Minhas Inadimplências</div>
+            <div style="font-size:13px;color:#888;margin-top:2px;">Dados consolidados via Open Finance e Serasa/SPC</div>
+          </div>
+          <div style="background:rgba(224,92,110,0.1);color:var(--danger);padding:8px 16px;border-radius:10px;font-weight:700;font-size:14px;">Total: R$ 3.450</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Dívidas Ativas</div><span class="panel-badge badge-danger">2 dívidas</span></div>
+          <div class="panel-body">
+            <div class="debt-item">
+              <div class="debt-icon" style="background:rgba(224,92,110,0.1);font-size:22px;">🏥</div>
+              <div class="debt-info">
+                <div class="debt-name">Clínica São Lucas</div>
+                <div class="debt-date">Contrato #2024-8821 • Venceu 10/03/2026</div>
+                <div style="font-size:12px;color:#aaa;margin-top:2px;">58 dias em atraso • Negativado no SPC</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="debt-amount" style="color:var(--danger);font-size:18px;">R$ 1.200,00</div>
+                <div class="debt-status status-overdue" style="margin-top:6px;">Negativado</div>
+                <button onclick="alert('Funcionalidade de negociação em breve!')" style="margin-top:8px;background:var(--gradient-btn);border:none;color:white;padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">Negociar</button>
+              </div>
+            </div>
+
+            <div class="debt-item">
+              <div class="debt-icon" style="background:rgba(240,164,74,0.12);font-size:22px;">📱</div>
+              <div class="debt-info">
+                <div class="debt-name">Operadora Vivo</div>
+                <div class="debt-date">Fatura #4490-B • Venceu 01/04/2026</div>
+                <div style="font-size:12px;color:#aaa;margin-top:2px;">36 dias em atraso • Pendente de negativação</div>
+              </div>
+              <div style="text-align:right;">
+                <div class="debt-amount" style="color:var(--warning);font-size:18px;">R$ 340,00</div>
+                <div class="debt-status status-pending" style="margin-top:6px;">Em atraso</div>
+                <button onclick="alert('Funcionalidade de pagamento em breve!')" style="margin-top:8px;background:rgba(240,164,74,0.15);border:1px solid var(--warning);color:var(--warning);padding:6px 14px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;">Pagar agora</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:24px;">
+          <div class="panel-header"><div class="panel-title">Contas em Dia</div><span class="panel-badge badge-success">3 contas</span></div>
+          <div class="panel-body">
+            <div class="debt-item">
+              <div class="debt-icon" style="background:rgba(76,175,125,0.1);font-size:22px;">🏠</div>
+              <div class="debt-info">
+                <div class="debt-name">Aluguel Imobiliária Central</div>
+                <div class="debt-date">Próx. vencimento: 01/06/2026</div>
+              </div>
+              <div><div class="debt-amount" style="color:var(--success);">R$ 1.800,00</div><div class="debt-status status-ok" style="margin-top:4px;">Em dia</div></div>
+            </div>
+            <div class="debt-item">
+              <div class="debt-icon" style="background:rgba(76,175,125,0.1);font-size:22px;">⚡</div>
+              <div class="debt-info">
+                <div class="debt-name">CELPE — Energia</div>
+                <div class="debt-date">Próx. vencimento: 20/05/2026</div>
+              </div>
+              <div><div class="debt-amount" style="color:var(--success);">R$ 187,00</div><div class="debt-status status-ok" style="margin-top:4px;">Em dia</div></div>
+            </div>
+            <div class="debt-item">
+              <div class="debt-icon" style="background:rgba(76,175,125,0.1);font-size:22px;">🌐</div>
+              <div class="debt-info">
+                <div class="debt-name">Internet Claro Fibra</div>
+                <div class="debt-date">Próx. vencimento: 25/05/2026</div>
+              </div>
+              <div><div class="debt-amount" style="color:var(--success);">R$ 99,90</div><div class="debt-status status-ok" style="margin-top:4px;">Em dia</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRANSACTIONS PAGE -->
+      <div id="page-transactions" class="section-page">
+        <div style="margin-bottom:24px;">
+          <div style="font-size:22px;font-weight:700;color:var(--black);">Extrato Completo</div>
+          <div style="font-size:13px;color:#888;margin-top:2px;">Histórico unificado de todos os bancos conectados</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Maio 2026</div>
+            <div style="display:flex;gap:8px;">
+              <span style="background:rgba(76,175,125,0.1);color:var(--success);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">+R$ 8.200</span>
+              <span style="background:rgba(224,92,110,0.1);color:var(--danger);padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;">-R$ 4.150</span>
+            </div>
+          </div>
+          <div class="panel-body" id="tx-list-full"></div>
+        </div>
+      </div>
+
+      <!-- OPEN FINANCE PAGE -->
+      <div id="page-openfinance" class="section-page">
+        <div style="margin-bottom:24px;">
+          <div style="font-size:22px;font-weight:700;color:var(--black);">Open Finance</div>
+          <div style="font-size:13px;color:#888;margin-top:2px;">Gerencie o compartilhamento de dados conforme regulação do Banco Central</div>
+        </div>
+
+        <div class="score-hero" style="padding:28px 32px;margin-bottom:24px;">
+          <div>
+            <div class="score-hero-label">Status Open Finance</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:26px;color:white;">Consentimento Ativo</div>
+            <div style="font-size:13px;color:var(--gray-mid);margin-top:6px;">Seus dados são compartilhados com segurança entre as instituições que você autorizou. Você pode revogar a qualquer momento.</div>
+          </div>
+          <div style="font-size:60px;">🔗</div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Instituições Conectadas</div><span class="panel-badge badge-success">3 ativas</span></div>
+          <div class="panel-body">
+            <div class="openf-list">
+              <div class="openf-item">
+                <div class="openf-logo">🏦</div>
+                <div style="flex:1;">
+                  <div class="openf-name">Banco do Brasil</div>
+                  <div class="openf-status">Conta corrente, saldo, extrato — Consentido em 12/01/2026</div>
+                </div>
+                <div class="openf-toggle on" onclick="this.classList.toggle('on')"></div>
+              </div>
+              <div class="openf-item">
+                <div class="openf-logo">🟠</div>
+                <div style="flex:1;">
+                  <div class="openf-name">Itaú Unibanco</div>
+                  <div class="openf-status">Dados de crédito, limite — Consentido em 03/02/2026</div>
+                </div>
+                <div class="openf-toggle on" onclick="this.classList.toggle('on')"></div>
+              </div>
+              <div class="openf-item">
+                <div class="openf-logo">💚</div>
+                <div style="flex:1;">
+                  <div class="openf-name">Nubank</div>
+                  <div class="openf-status">Cartão, extrato, fatura — Desativado</div>
+                </div>
+                <div class="openf-toggle" onclick="this.classList.toggle('on')"></div>
+              </div>
+              <div class="openf-item" style="background:rgba(244,165,184,0.08);border:1px dashed rgba(244,165,184,0.3);cursor:pointer;" onclick="alert('Em breve: conectar nova instituição via Open Finance!')">
+                <div class="openf-logo" style="background:none;border:1px dashed rgba(244,165,184,0.4);">➕</div>
+                <div>
+                  <div class="openf-name" style="color:var(--rose-deep);">Conectar nova instituição</div>
+                  <div class="openf-status">Bancos, fintechs e cooperativas participantes</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:24px;">
+          <div class="panel-header"><div class="panel-title">Dados Compartilhados</div></div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;">
+              <div style="padding:16px;background:rgba(76,175,125,0.06);border:1px solid rgba(76,175,125,0.2);border-radius:12px;">
+                <div style="font-size:22px;margin-bottom:8px;">💰</div>
+                <div style="font-size:13px;font-weight:600;color:var(--black);">Dados de Conta</div>
+                <div style="font-size:11px;color:#888;margin-top:4px;">Saldo, extrato, chave Pix</div>
+                <div style="margin-top:8px;font-size:11px;color:var(--success);font-weight:600;">● Compartilhando</div>
+              </div>
+              <div style="padding:16px;background:rgba(76,175,125,0.06);border:1px solid rgba(76,175,125,0.2);border-radius:12px;">
+                <div style="font-size:22px;margin-bottom:8px;">📊</div>
+                <div style="font-size:13px;font-weight:600;color:var(--black);">Dados de Crédito</div>
+                <div style="font-size:11px;color:#888;margin-top:4px;">Limite, fatura, score</div>
+                <div style="margin-top:8px;font-size:11px;color:var(--success);font-weight:600;">● Compartilhando</div>
+              </div>
+              <div style="padding:16px;background:rgba(240,164,74,0.06);border:1px solid rgba(240,164,74,0.2);border-radius:12px;">
+                <div style="font-size:22px;margin-bottom:8px;">📋</div>
+                <div style="font-size:13px;font-weight:600;color:var(--black);">Dados Cadastrais</div>
+                <div style="font-size:11px;color:#888;margin-top:4px;">Nome, CPF, endereço</div>
+                <div style="margin-top:8px;font-size:11px;color:var(--warning);font-weight:600;">⚠ Parcial</div>
+              </div>
+              <div style="padding:16px;background:rgba(200,184,188,0.06);border:1px solid rgba(200,184,188,0.2);border-radius:12px;">
+                <div style="font-size:22px;margin-bottom:8px;">📈</div>
+                <div style="font-size:13px;font-weight:600;color:var(--black);">Investimentos</div>
+                <div style="font-size:11px;color:#888;margin-top:4px;">Carteira, rendimentos</div>
+                <div style="margin-top:8px;font-size:11px;color:#aaa;font-weight:600;">○ Não compartilhando</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BANKS PAGE -->
+      <div id="page-banks" class="section-page">
+        <div style="margin-bottom:24px;">
+          <div style="font-size:22px;font-weight:700;color:var(--black);">Bancos Vinculados</div>
+          <div style="font-size:13px;color:#888;margin-top:2px;">Visão consolidada de todas as suas contas</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+          <div class="panel">
+            <div style="padding:24px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="width:48px;height:48px;background:#f5e6c8;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;">🏦</div>
+                <div><div style="font-weight:700;color:var(--black);">Banco do Brasil</div><div style="font-size:12px;color:#888;">Conta Corrente ••4821</div></div>
+              </div>
+              <div style="font-size:28px;font-weight:700;color:var(--black);">R$ 2.340,00</div>
+              <div style="font-size:12px;color:#888;margin-top:4px;">Saldo disponível</div>
+              <div style="margin-top:16px;display:flex;gap:8px;">
+                <div style="flex:1;padding:10px;background:rgba(76,175,125,0.08);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Crédito</div>
+                  <div style="font-weight:700;color:var(--success);font-size:14px;">R$ 5.000</div>
+                </div>
+                <div style="flex:1;padding:10px;background:rgba(224,92,110,0.08);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Débito</div>
+                  <div style="font-weight:700;color:var(--danger);font-size:14px;">-R$ 890</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div style="padding:24px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="width:48px;height:48px;background:#fff0e0;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;">🟠</div>
+                <div><div style="font-weight:700;color:var(--black);">Itaú Unibanco</div><div style="font-size:12px;color:#888;">Cartão de Crédito ••9934</div></div>
+              </div>
+              <div style="font-size:28px;font-weight:700;color:var(--black);">R$ 7.200,00</div>
+              <div style="font-size:12px;color:#888;margin-top:4px;">Limite disponível</div>
+              <div style="margin-top:16px;display:flex;gap:8px;">
+                <div style="flex:1;padding:10px;background:rgba(244,165,184,0.1);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Limite Total</div>
+                  <div style="font-weight:700;color:var(--rose-deep);font-size:14px;">R$ 12.000</div>
+                </div>
+                <div style="flex:1;padding:10px;background:rgba(224,92,110,0.08);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Fatura</div>
+                  <div style="font-weight:700;color:var(--danger);font-size:14px;">R$ 4.800</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div style="padding:24px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                <div style="width:48px;height:48px;background:#f0fff6;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;">💚</div>
+                <div><div style="font-weight:700;color:var(--black);">Nubank</div><div style="font-size:12px;color:#888;">Conta Digital ••2207</div></div>
+              </div>
+              <div style="font-size:28px;font-weight:700;color:var(--black);">R$ 480,50</div>
+              <div style="font-size:12px;color:#888;margin-top:4px;">Saldo em conta</div>
+              <div style="margin-top:16px;display:flex;gap:8px;">
+                <div style="flex:1;padding:10px;background:rgba(76,175,125,0.08);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Rendimento</div>
+                  <div style="font-weight:700;color:var(--success);font-size:14px;">+R$ 3,20</div>
+                </div>
+                <div style="flex:1;padding:10px;background:rgba(200,184,188,0.1);border-radius:10px;text-align:center;">
+                  <div style="font-size:11px;color:#888;">Status OF</div>
+                  <div style="font-weight:700;color:#aaa;font-size:13px;">Desativado</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE PAGE -->
+      <div id="page-profile" class="section-page">
+        <div style="margin-bottom:24px;">
+          <div style="font-size:22px;font-weight:700;color:var(--black);">Meu Perfil</div>
+        </div>
+        <div class="panel">
+          <div style="padding:32px;display:flex;gap:24px;align-items:center;border-bottom:1px solid rgba(13,10,11,0.06);">
+            <div style="width:80px;height:80px;background:var(--gradient-btn);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:white;flex-shrink:0;" id="profile-avatar-big">A</div>
+            <div>
+              <div style="font-size:22px;font-weight:700;color:var(--black);" id="profile-name-big">Usuário NovaPay</div>
+              <div style="font-size:14px;color:#888;" id="profile-email-big">usuario@email.com</div>
+              <div style="margin-top:10px;display:flex;gap:8px;">
+                <span style="background:rgba(244,165,184,0.15);color:var(--rose-deep);padding:4px 12px;border-radius:50px;font-size:11px;font-weight:600;">Conta Premium</span>
+                <span class="openf-chip">🔗 Open Finance</span>
+              </div>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;">
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Nome completo</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-name">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">CPF</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-cpf">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">E-mail</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-email">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Telefone</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-phone">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Endereço</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-addr">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Sexo</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-gender">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Renda</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-income">—</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--rose);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;">Ocupação</div>
+                <div style="font-size:15px;font-weight:600;color:var(--black);" id="pf-job">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== STATE =====
+  let userData = {};
+
+  const transactions = [
+    { name: 'Salário — Empresa XYZ', date: '01/05/2026', amount: 6800, type: 'credit', icon: '💼', bg: 'rgba(76,175,125,0.12)' },
+    { name: 'Supermercado Atacadão', date: '02/05/2026', amount: -320, type: 'debit', icon: '🛒', bg: 'rgba(224,92,110,0.1)' },
+    { name: 'Transferência recebida', date: '03/05/2026', amount: 1400, type: 'credit', icon: '↙️', bg: 'rgba(76,175,125,0.12)' },
+    { name: 'Farmácia São João', date: '03/05/2026', amount: -89, type: 'debit', icon: '💊', bg: 'rgba(224,92,110,0.1)' },
+    { name: 'Combustível Shell', date: '04/05/2026', amount: -180, type: 'debit', icon: '⛽', bg: 'rgba(224,92,110,0.1)' },
+    { name: 'Restaurante Churrascaria', date: '05/05/2026', amount: -95, type: 'debit', icon: '🍖', bg: 'rgba(224,92,110,0.1)' },
+    { name: 'Pix recebido — João S.', date: '05/05/2026', amount: 200, type: 'credit', icon: '📲', bg: 'rgba(76,175,125,0.12)' },
+    { name: 'Netflix', date: '06/05/2026', amount: -37, type: 'debit', icon: '🎬', bg: 'rgba(224,92,110,0.1)' },
+    { name: 'Farmácia São João', date: '06/05/2026', amount: -45, type: 'debit', icon: '💊', bg: 'rgba(224,92,110,0.1)' },
+  ];
+
+  function renderTxList(containerId, limit) {
+    const c = document.getElementById(containerId);
+    if (!c) return;
+    const list = limit ? transactions.slice(0, limit) : transactions;
+    c.innerHTML = list.map(t => `
+      <div class="tx-item">
+        <div class="tx-icon" style="background:${t.bg};">${t.icon}</div>
+        <div class="tx-info">
+          <div class="tx-name">${t.name}</div>
+          <div class="tx-date">${t.date}</div>
+        </div>
+        <div class="tx-amount ${t.type}">${t.amount > 0 ? '+' : ''}R$ ${Math.abs(t.amount).toFixed(2).replace('.',',')}</div>
+      </div>
+    `).join('');
+  }
+
+  // ===== AUTH =====
+  function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+    document.getElementById('login-panel').classList.toggle('active', tab==='login');
+    document.getElementById('register-panel').classList.toggle('active', tab==='register');
+  }
+
+  function maskCPF(el) {
+    let v = el.value.replace(/\D/g,'');
+    if (v.length > 3) v = v.slice(0,3)+'.'+v.slice(3);
+    if (v.length > 7) v = v.slice(0,7)+'.'+v.slice(7);
+    if (v.length > 11) v = v.slice(0,11)+'-'+v.slice(11);
+    el.value = v.slice(0,14);
+  }
+
+  function maskPhone(el) {
+    let v = el.value.replace(/\D/g,'');
+    if (v.length > 0) v = '('+v;
+    if (v.length > 3) v = v.slice(0,3)+') '+v.slice(3);
+    if (v.length > 10) v = v.slice(0,10)+'-'+v.slice(10);
+    el.value = v.slice(0,15);
+  }
+
+  function maskCEP(el) {
+    let v = el.value.replace(/\D/g,'');
+    if (v.length > 5) v = v.slice(0,5)+'-'+v.slice(5);
+    el.value = v.slice(0,9);
+  }
+
+  function doLogin() {
+    const email = document.getElementById('login-email').value || 'usuario@novapay.com';
+    userData = {
+      name: 'Ana Carolina Silva',
+      email: email,
+      cpf: '123.456.789-00',
+      phone: '(81) 99999-1234',
+      addr: 'Rua das Flores, 42, Centro, São Lourenço da Mata - PE',
+      gender: 'Feminino',
+      income: 'R$ 3.000 – R$ 7.000',
+      job: 'CLT',
+    };
+    showDashboard();
+  }
+
+  function doRegister() {
+    const name = document.getElementById('reg-name').value;
+    const lname = document.getElementById('reg-lname').value;
+    const email = document.getElementById('reg-email').value;
+    const cpf = document.getElementById('reg-cpf').value;
+    const phone = document.getElementById('reg-phone').value;
+    const addr = document.getElementById('reg-addr').value;
+    const gender = document.getElementById('reg-gender').value;
+    const income = document.getElementById('reg-income').value;
+    const job = document.getElementById('reg-job').value;
+
+    if (!name || !email) { alert('Preencha nome e e-mail para continuar.'); return; }
+
+    userData = {
+      name: (name + ' ' + lname).trim() || 'Novo Usuário',
+      email: email || 'usuario@novapay.com',
+      cpf: cpf || '—',
+      phone: phone || '—',
+      addr: addr || '—',
+      gender: gender || '—',
+      income: income || '—',
+      job: job || '—',
+    };
+    showDashboard();
+  }
+
+  function showDashboard() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+
+    const firstName = userData.name.split(' ')[0];
+    const initial = firstName[0].toUpperCase();
+
+    document.getElementById('sidebar-avatar').textContent = initial;
+    document.getElementById('sidebar-name').textContent = userData.name;
+    document.getElementById('profile-avatar-big').textContent = initial;
+    document.getElementById('profile-name-big').textContent = userData.name;
+    document.getElementById('profile-email-big').textContent = userData.email;
+    document.getElementById('dash-greeting').textContent = 'Olá, ' + firstName + ' 👋';
+
+    document.getElementById('pf-name').textContent = userData.name;
+    document.getElementById('pf-email').textContent = userData.email;
+    document.getElementById('pf-cpf').textContent = userData.cpf;
+    document.getElementById('pf-phone').textContent = userData.phone;
+    document.getElementById('pf-addr').textContent = userData.addr;
+    document.getElementById('pf-gender').textContent = userData.gender;
+    document.getElementById('pf-income').textContent = userData.income;
+    document.getElementById('pf-job').textContent = userData.job;
+
+    renderTxList('tx-list-home', 5);
+    renderTxList('tx-list-full');
+
+    setTimeout(() => {
+      animateScore('score-arc-home', 'score-num-home', 582);
+    }, 300);
+  }
+
+  // ===== NAVIGATION =====
+  function showPage(id, el) {
+    document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    const titles = { home: 'Início', score: 'Meu Score', debts: 'Inadimplências', transactions: 'Extrato', openfinance: 'Open Finance', banks: 'Bancos Vinculados', profile: 'Meu Perfil' };
+    document.getElementById('page-title').textContent = titles[id] || id;
+
+    if (id === 'score') {
+      setTimeout(() => animateScore('score-arc-detail', 'score-num-detail', 582), 200);
+    }
+
+    closeSidebar();
+  }
+
+  // ===== SCORE ANIMATION =====
+  function animateScore(arcId, numId, target) {
+    const arc = document.getElementById(arcId);
+    const num = document.getElementById(numId);
+    if (!arc || !num) return;
+    const circumference = 339.3;
+    const offset = circumference - (target / 1000) * circumference;
+    arc.style.transition = 'stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1)';
+    arc.style.strokeDashoffset = offset;
+    let current = 0;
+    const step = target / 60;
+    const interval = setInterval(() => {
+      current = Math.min(current + step, target);
+      num.textContent = Math.round(current);
+      if (current >= target) clearInterval(interval);
+    }, 25);
+  }
+
+  // ===== SIDEBAR =====
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('overlay').classList.toggle('show');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  function doLogout() {
+    if (confirm('Deseja sair da sua conta?')) {
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'flex';
+    }
+  }
+</script>
+</body>
+</html>
