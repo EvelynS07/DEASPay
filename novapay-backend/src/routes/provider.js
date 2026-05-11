@@ -119,13 +119,42 @@ function buildRedirectUrl(redirectUri, params) {
   return url.toString();
 }
 
-function renderConsentForm(req, res, message = '') {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(req.query)) {
-    if (value !== undefined && value !== null) params.set(key, value);
+function oauthParam(req, ...names) {
+  for (const name of names) {
+    const queryValue = req.query?.[name];
+    const bodyValue = req.body?.[name];
+    const found = firstDefined(queryValue, bodyValue);
+    if (found !== undefined) return found;
   }
+  return undefined;
+}
 
-  const action = `${req.path}?${params.toString()}`;
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function collectOauthParams(req) {
+  const merged = { ...(req.query || {}), ...(req.body || {}) };
+  const keys = [
+    'client_id', 'clientId', 'redirect_uri', 'redirectUri', 'response_type',
+    'responseType', 'type', 'scope', 'state', 'code_challenge',
+    'code_challenge_method', 'nonce'
+  ];
+  return keys
+    .filter((key) => merged[key] !== undefined && merged[key] !== null && String(merged[key]).trim() !== '')
+    .map((key) => `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(merged[key])}" />`)
+    .join('\n      ');
+}
+
+function renderConsentForm(req, res, message = '') {
+  const action = req.originalUrl.split('?')[0];
+  const hiddenOauthFields = collectOauthParams(req);
+
   res.status(200).type('html').send(`<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -147,7 +176,8 @@ function renderConsentForm(req, res, message = '') {
     <h1>Autorizar compartilhamento</h1>
     <p>Entre com sua conta DEASPay para liberar saldo, score, extrato e inadimplências para o banco solicitante. Se ainda não tem conta, cadastre-se primeiro no DEASPay.</p>
     ${message ? `<div class="msg">${message}</div>` : ''}
-    <form method="GET" action="${action}">
+    <form method="POST" action="${action}">
+      ${hiddenOauthFields}
       <label for="identifier">E-mail ou CPF</label>
       <input id="identifier" name="identifier" placeholder="seuemail@exemplo.com ou 000.000.000-00" required />
       <label for="password">Senha DEASPay</label>
@@ -178,16 +208,15 @@ async function resolveUserFromIdentifier(identifier, password) {
   return user;
 }
 
-// GET /authorize — início do fluxo OAuth2 Authorization Code.
-router.get('/authorize', async (req, res) => {
-  const clientId = firstDefined(req.query.client_id, req.query.clientId);
-  const redirectUri = firstDefined(req.query.redirect_uri, req.query.redirectUri);
+async function handleAuthorize(req, res) {
+  const clientId = firstDefined(oauthParam(req, 'client_id', 'clientId'), process.env.OAUTH_CLIENT_ID);
+  const redirectUri = oauthParam(req, 'redirect_uri', 'redirectUri');
   // Alguns clientes OAuth/Open Finance enviam responseType, tipo ou até omitem response_type.
   // Para compatibilidade com o Deas Finance, quando vier ausente assumimos Authorization Code.
-  const rawResponseType = firstDefined(req.query.response_type, req.query.responseType, req.query.type, 'code');
+  const rawResponseType = firstDefined(oauthParam(req, 'response_type', 'responseType', 'type'), 'code');
   const responseType = String(rawResponseType).toLowerCase().trim();
-  const scope = firstDefined(req.query.scope, 'accounts balances transactions score debts');
-  const state = req.query.state;
+  const scope = firstDefined(oauthParam(req, 'scope'), 'accounts balances transactions score debts');
+  const state = oauthParam(req, 'state');
 
   if (!['code', 'authorization_code'].includes(responseType)) {
     // Em vez de quebrar o fluxo com uma tela JSON crua, devolve erro OAuth para o redirect_uri quando possível.
@@ -203,7 +232,14 @@ router.get('/authorize', async (req, res) => {
     return res.status(400).json({ error: 'unsupported_response_type', error_description: 'Use response_type=code.' });
   }
   if (!clientId || !redirectUri) {
-    return res.status(400).json({ error: 'invalid_request', error_description: 'client_id e redirect_uri são obrigatórios.' });
+    return res.status(400).json({
+      error: 'invalid_request',
+      error_description: 'client_id e redirect_uri são obrigatórios.',
+      debug: {
+        receivedQueryKeys: Object.keys(req.query || {}),
+        receivedBodyKeys: Object.keys(req.body || {}),
+      },
+    });
   }
   if (!providerClientIsAllowed(clientId)) {
     return res.status(401).json({ error: 'unauthorized_client', error_description: 'client_id não autorizado neste provedor.' });
@@ -216,11 +252,13 @@ router.get('/authorize', async (req, res) => {
   }
 
   try {
-    const identifierUser = await resolveUserFromIdentifier(req.query.identifier, req.query.password);
+    const identifier = oauthParam(req, 'identifier');
+    const password = oauthParam(req, 'password');
+    const identifierUser = await resolveUserFromIdentifier(identifier, password);
     const user = identifierUser || await resolveUserForAuthorization(req);
 
     if (!user) {
-      return renderConsentForm(req, res, req.query.identifier ? 'Usuário/senha inválidos ou conta inativa.' : '');
+      return renderConsentForm(req, res, identifier ? 'Usuário/senha inválidos ou conta inativa.' : '');
     }
 
     const code = `deaspay_code_${randomUUID()}`;
@@ -236,7 +274,13 @@ router.get('/authorize', async (req, res) => {
     console.error('Erro em /authorize:', err);
     return res.status(500).json({ error: 'server_error', error_description: 'Erro ao iniciar autorização.' });
   }
-});
+}
+
+// GET /authorize — início do fluxo OAuth2 Authorization Code.
+router.get('/authorize', handleAuthorize);
+
+// POST /authorize — envio do formulário de consentimento preservando client_id/redirect_uri.
+router.post('/authorize', handleAuthorize);
 
 // POST /token — troca authorization_code por access_token.
 router.post('/token', async (req, res) => {
