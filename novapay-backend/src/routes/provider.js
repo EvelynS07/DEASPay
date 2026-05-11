@@ -151,11 +151,29 @@ function collectOauthParams(req) {
     .join('\n      ');
 }
 
+function getDefaultRedirectUri() {
+  return firstDefined(
+    process.env.DEASFINANCE_CALLBACK_URL,
+    process.env.DEAS_FINANCE_CALLBACK_URL,
+    process.env.DEFAULT_REDIRECT_URI,
+    process.env.OAUTH_DEFAULT_REDIRECT_URI,
+    'https://deas-three.vercel.app/api/open-finance/callback'
+  );
+}
+
 function renderConsentForm(req, res, message = '') {
-  // IMPORTANTE: action vazio + JS abaixo faz o navegador enviar o POST para a URL atual completa,
-  // incluindo a query string original do Deas Finance (client_id, redirect_uri, state etc.).
-  // Isso evita perder os parâmetros OAuth em rewrites da Vercel.
-  const hiddenOauthFields = collectOauthParams(req);
+  // Funciona mesmo se o Deas Finance abrir /api/oauth/authorize sem query string.
+  // Quando a query existir, preservamos; quando não existir, usamos defaults seguros.
+  const defaults = {
+    client_id: firstDefined(oauthParam(req, 'client_id', 'clientId'), process.env.OAUTH_CLIENT_ID, 'deaspay_client_001'),
+    redirect_uri: firstDefined(oauthParam(req, 'redirect_uri', 'redirectUri'), getDefaultRedirectUri()),
+    response_type: firstDefined(oauthParam(req, 'response_type', 'responseType', 'type'), 'code'),
+    scope: firstDefined(oauthParam(req, 'scope'), 'accounts balances transactions score debts'),
+    state: oauthParam(req, 'state'),
+  };
+  const reqForHidden = { query: { ...defaults, ...(req.query || {}) }, body: req.body || {} };
+  const hiddenOauthFields = collectOauthParams(reqForHidden);
+  const action = req.originalUrl?.startsWith('/api/oauth') ? '/api/oauth/authorize' : '/authorize';
 
   res.status(200).type('html').send(`<!doctype html>
 <html lang="pt-BR">
@@ -178,7 +196,7 @@ function renderConsentForm(req, res, message = '') {
     <h1>Autorizar compartilhamento</h1>
     <p>Entre com sua conta DEASPay para liberar saldo, score, extrato e inadimplências para o banco solicitante. Se ainda não tem conta, cadastre-se primeiro no DEASPay.</p>
     ${message ? `<div class="msg">${message}</div>` : ''}
-    <form id="authorize-form" method="POST" action="" onsubmit="this.action = window.location.href; const b=this.querySelector('button[type=submit]'); b.disabled=true; b.textContent='Autorizando...';">
+    <form method="POST" action="${action}">
       ${hiddenOauthFields}
       <label for="identifier">E-mail ou CPF</label>
       <input id="identifier" name="identifier" placeholder="seuemail@exemplo.com ou 000.000.000-00" required />
@@ -211,8 +229,14 @@ async function resolveUserFromIdentifier(identifier, password) {
 }
 
 async function handleAuthorize(req, res) {
-  const clientId = firstDefined(oauthParam(req, 'client_id', 'clientId'), process.env.OAUTH_CLIENT_ID);
-  const redirectUri = oauthParam(req, 'redirect_uri', 'redirectUri');
+  const clientId = firstDefined(
+    oauthParam(req, 'client_id', 'clientId'),
+    process.env.OAUTH_CLIENT_ID,
+    process.env.PROVIDER_CLIENT_ID,
+    process.env.OPEN_FINANCE_CLIENT_ID,
+    'deaspay_client_001'
+  );
+  const redirectUri = firstDefined(oauthParam(req, 'redirect_uri', 'redirectUri'), getDefaultRedirectUri());
   // Alguns clientes OAuth/Open Finance enviam responseType, tipo ou até omitem response_type.
   // Para compatibilidade com o Deas Finance, quando vier ausente assumimos Authorization Code.
   const rawResponseType = firstDefined(oauthParam(req, 'response_type', 'responseType', 'type'), 'code');

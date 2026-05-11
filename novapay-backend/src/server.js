@@ -27,7 +27,10 @@ const __dirname = path.dirname(__filename);
 const frontendIndex = path.resolve(__dirname, '../../index.html');
 const PORT = process.env.PORT || 3001;
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false,
+}));
 
 const configuredOrigins = (process.env.FRONTEND_URL || '')
   .split(',')
