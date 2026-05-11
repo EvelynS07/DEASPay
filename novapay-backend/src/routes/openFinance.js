@@ -47,11 +47,11 @@ function getProviderConfig(institution) {
   if (isLarabank) {
     return {
       provider: 'larabank',
-      clientId: process.env.LARABANK_CLIENT_ID || 'larabank_client_001',
+      clientId: process.env.LARABANK_CLIENT_ID || 'client_tgonmpn3',
       clientSecret: process.env.LARABANK_CLIENT_SECRET || '',
-      authUrl: process.env.LARABANK_AUTH_URL || `${base}/api/oauth/authorize`,
-      tokenUrl: process.env.LARABANK_TOKEN_URL || `${base}/api/oauth/token`,
-      accountsUrl: process.env.LARABANK_ACCOUNTS_URL || `${base}/api/provider/accounts`,
+      authUrl: process.env.LARABANK_AUTH_URL || `${base || 'https://larabankdigital-82k2.vercel.app'}/api/oauth/authorize`,
+      tokenUrl: process.env.LARABANK_TOKEN_URL || `${base || 'https://larabankdigital-82k2.vercel.app'}/api/oauth/token`,
+      accountsUrl: process.env.LARABANK_ACCOUNTS_URL || `${base || 'https://larabankdigital-82k2.vercel.app'}/api/open-finance/provider/accounts`,
     };
   }
 
