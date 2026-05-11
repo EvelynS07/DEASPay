@@ -20,6 +20,8 @@ async function migrate() {
     console.log('⚠️  Resetando banco de dados...');
     await query(`
       DROP TABLE IF EXISTS
+        oauth_access_tokens,
+        oauth_authorization_codes,
         open_finance_consents,
         open_finance_institutions,
         credit_score_history,
@@ -355,6 +357,39 @@ async function migrate() {
     )
   `);
 
+
+
+  // ──────────────────────────────────────────
+  // TABELAS: OAuth2 Provider
+  // Códigos e tokens para DEASPay expor dados reais a outros bancos
+  // ──────────────────────────────────────────
+  await query(`
+    CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+      id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      code              TEXT UNIQUE NOT NULL,
+      user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id         VARCHAR(255) NOT NULL,
+      redirect_uri      TEXT NOT NULL,
+      scope             TEXT DEFAULT 'accounts balances transactions score debts',
+      expires_at        TIMESTAMPTZ NOT NULL,
+      used_at           TIMESTAMPTZ,
+      created_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS oauth_access_tokens (
+      id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      token             TEXT UNIQUE NOT NULL,
+      user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      client_id         VARCHAR(255) NOT NULL,
+      scope             TEXT DEFAULT 'accounts balances transactions score debts',
+      expires_at        TIMESTAMPTZ NOT NULL,
+      revoked_at        TIMESTAMPTZ,
+      created_at        TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   // ──────────────────────────────────────────
   // ÍNDICES — performance nas queries mais frequentes
   // ──────────────────────────────────────────
@@ -367,6 +402,9 @@ async function migrate() {
   await query(`CREATE INDEX IF NOT EXISTS idx_debts_status ON debts(status)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_score_user ON credit_score_history(user_id, calculated_at DESC)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_consents_user ON open_finance_consents(user_id)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_oauth_codes_code ON oauth_authorization_codes(code)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_oauth_tokens_token ON oauth_access_tokens(token)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user ON oauth_access_tokens(user_id)`);
 
   // ──────────────────────────────────────────
   // TRIGGER: updated_at automático
@@ -396,7 +434,7 @@ async function migrate() {
   console.log('  ✓ debts                      — inadimplências e negativações');
   console.log('  ✓ credit_score_history       — histórico de score');
   console.log('  ✓ open_finance_institutions  — catálogo de instituições');
-  console.log('  ✓ open_finance_consents      — consentimentos do usuário\n');
+  console.log('  ✓ open_finance_consents      — consentimentos do usuário\n  ✓ oauth_authorization_codes   — códigos OAuth de curta duração\n  ✓ oauth_access_tokens         — tokens Bearer do provedor\n');
 
   process.exit(0);
 }

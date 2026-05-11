@@ -1,6 +1,6 @@
-# NovaPay Backend 🏦
+# DEASPay Backend 🏦
 
-Backend completo do banco digital NovaPay com Open Finance integrado.
+Backend completo do banco digital DEASPay com Open Finance integrado.
 
 ---
 
@@ -20,7 +20,7 @@ O Neon permite criar **branches do banco** (como Git branches) para testar migra
 ### Alternativas consideradas
 | Solução | Por que não? |
 |---|---|
-| **Supabase** | Bom, mas adiciona camada Supabase Auth que conflita com o JWT próprio do NovaPay |
+| **Supabase** | Bom, mas adiciona camada Supabase Auth que conflita com o JWT próprio do DEASPay |
 | **PlanetScale** | MySQL — não tem suporte nativo a JSONB (usado nos `permissions` de Open Finance) nem a `uuid-ossp` |
 | **Railway Postgres** | Sem branching, sem serverless driver otimizado |
 | **RDS Aurora** | Excelente, mas custo alto e setup complexo para MVP |
@@ -30,7 +30,7 @@ O Neon permite criar **branches do banco** (como Git branches) para testar migra
 ## 📁 Estrutura do Projeto
 
 ```
-novapay-backend/
+deaspay-backend/
 ├── src/
 │   ├── server.js                  # Entry point Express
 │   ├── database/
@@ -147,7 +147,7 @@ POST   /api/debts/:id/negotiate    Proposta de negociação
 POST   /api/debts/:id/pay         Registra pagamento
 ```
 
-### Open Finance
+### Open Finance — cliente dentro do DEASPay
 ```
 GET    /api/open-finance/institutions   Catálogo de bancos
 GET    /api/open-finance/consents       Consentimentos ativos
@@ -156,6 +156,21 @@ DELETE /api/open-finance/consent/:id    Revoga consentimento
 POST   /api/open-finance/sync/:instId   Força sincronização
 GET    /api/open-finance/summary        Resumo consolidado
 ```
+
+### Provider OAuth — DEASPay expondo dados para outro banco
+```
+GET    /authorize                       Inicia OAuth e gera code
+POST   /token                           Troca code por access_token
+GET    /provider/accounts               Retorna contas, saldo, score, dívidas e extrato reais
+```
+
+Aliases compatíveis:
+```
+GET    /api/oauth/authorize
+POST   /api/oauth/token
+GET    /api/provider/accounts
+```
+
 
 ---
 
@@ -179,13 +194,13 @@ O score é calculado com 5 fatores ponderados, inspirado no modelo FICO adaptado
 ### 1. Configure o Neon
 ```bash
 # 1. Crie uma conta em https://console.neon.tech (gratuito)
-# 2. Crie um projeto chamado "novapay"
+# 2. Crie um projeto chamado "deaspay"
 # 3. Copie a connection string (DATABASE_URL)
 ```
 
 ### 2. Instale e configure
 ```bash
-cd novapay-backend
+cd deaspay-backend
 npm install
 cp .env.example .env
 # Edite .env com sua DATABASE_URL do Neon
@@ -194,7 +209,7 @@ cp .env.example .env
 ### 3. Banco de dados
 ```bash
 npm run db:migrate    # Cria as 8 tabelas
-npm run db:seed       # Insere dados demo
+npm run db:seed       # Insere/atualiza instituições, sem criar conta demo
 ```
 
 ### 4. Servidor
@@ -209,7 +224,7 @@ curl http://localhost:3001/health
 
 curl -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"ana@novapay.com","password":"Novapay@123"}'
+  -d '{"email":"ana@deaspay.com","password":"Novapay@123"}'
 ```
 
 ---
@@ -241,3 +256,40 @@ railway init
 railway add --plugin postgresql  # ou use Neon via DATABASE_URL
 railway up
 ```
+
+---
+
+## 🔗 Fluxo real para outro banco conectar
+
+1. O banco parceiro redireciona o cliente para:
+```txt
+GET /authorize?response_type=code&client_id=SEU_CLIENT_ID&redirect_uri=https://banco-parceiro.com/callback&state=abc
+```
+
+2. O cliente informa CPF/e-mail da conta DEASPay e autoriza.
+
+3. O DEASPay redireciona para o parceiro:
+```txt
+https://banco-parceiro.com/callback?code=deaspay_code_...&state=abc
+```
+
+4. O parceiro troca o code por token:
+```bash
+curl -X POST https://seu-backend.vercel.app/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "grant_type":"authorization_code",
+    "code":"deaspay_code_...",
+    "client_id":"SEU_CLIENT_ID",
+    "client_secret":"SEU_CLIENT_SECRET",
+    "redirect_uri":"https://banco-parceiro.com/callback"
+  }'
+```
+
+5. O parceiro consulta os dados reais:
+```bash
+curl https://seu-backend.vercel.app/provider/accounts \
+  -H "Authorization: Bearer deaspay_token_..."
+```
+
+O retorno inclui contas, saldo disponível, limite, extrato, score recalculado e inadimplências vindas do banco Neon.
