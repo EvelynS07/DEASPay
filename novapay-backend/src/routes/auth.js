@@ -79,11 +79,19 @@ router.post('/register', registerValidators, async (req, res) => {
         ) VALUES ($1,$2,$3,'corrente',0.00,$4,$5,$6)
       `, [accountId, userId, accountNumber, initialCreditLimit, cpf, email]);
 
-      // Score inicial zerado
+      // Score inicial realista, baseado nos dados declarados do cadastro.
+      // Não é fixo/demo: renda declarada e limite inicial entram no cálculo inicial.
+      const incomeFactor = declaredIncome >= 10000 ? 0.82
+        : declaredIncome >= 7000 ? 0.74
+        : declaredIncome >= 5000 ? 0.66
+        : declaredIncome >= 3000 ? 0.56
+        : declaredIncome >= 1500 ? 0.46
+        : 0.36;
+      const initialScore = Math.round(1000 * (0.45 * 1 + 0.20 * 1 + 0.20 * incomeFactor + 0.10 * 0.15 + 0.05 * 0.25));
       await client.query(`
         INSERT INTO credit_score_history (user_id, score, payment_history, credit_usage, credit_age, credit_mix, new_inquiries)
-        VALUES ($1, 300, 0.5, 0.0, 0.0, 0.0, 1.0)
-      `, [userId]);
+        VALUES ($1, $2, 1.0, 1.0, 0.15, 0.25, $3)
+      `, [userId, initialScore, incomeFactor]);
     });
 
     const { access, refresh } = generateTokens(userId);

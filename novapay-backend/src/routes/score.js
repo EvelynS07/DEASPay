@@ -1,100 +1,148 @@
 // src/routes/score.js
 // ================================================================
-// Score de crédito real baseado em contas, transações, dívidas e OF
+// Score DEASPay realista: calculado a partir de renda, uso de crédito,
+// saldo, movimentação, inadimplência e dados Open Finance externos.
+// Não usa score fixo/demo.
 // ================================================================
 
 import { Router } from 'express';
 import { query } from '../database/connection.js';
 import { authenticate } from '../middleware/auth.js';
 
-const WEIGHTS = {
-  payment_history: 0.35,
-  credit_usage: 0.30,
-  credit_age: 0.15,
-  credit_mix: 0.10,
-  new_inquiries: 0.10,
-};
 const MAX_SCORE = 1000;
 
-export async function calculateAndSaveScore(userId) {
-  // Garante colunas usadas pelo Open Finance receptor em bancos que já tinham schema antigo.
+function clamp(value, min = 0, max = 1) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.max(min, Math.min(max, n));
+}
+
+function money(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function scoreFromIncome(income) {
+  const value = money(income);
+  if (value <= 0) return 0.35;
+  if (value >= 15000) return 1.0;
+  if (value >= 10000) return 0.9;
+  if (value >= 7000) return 0.8;
+  if (value >= 5000) return 0.7;
+  if (value >= 3000) return 0.58;
+  if (value >= 1500) return 0.45;
+  return 0.35;
+}
+
+export async function ensureScoreSupportColumns() {
   await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_score SMALLINT DEFAULT 0`).catch(() => {});
   await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_debt DECIMAL(15,2) DEFAULT 0`).catch(() => {});
   await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_income DECIMAL(15,2) DEFAULT 0`).catch(() => {});
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS provider_payload JSONB DEFAULT '{}'`).catch(() => {});
+}
+
+export async function calculateAndSaveScore(userId) {
+  await ensureScoreSupportColumns();
 
   const [userRow, accountRows, debtRows, txRows, consentRows] = await Promise.all([
-    query(`SELECT created_at FROM users WHERE id = $1`, [userId]),
-    query(`SELECT balance, credit_limit, credit_used FROM accounts WHERE user_id = $1 AND is_active = true`, [userId]),
-    query(`SELECT status, days_overdue, is_blacklisted FROM debts WHERE user_id = $1`, [userId]),
+    query(`SELECT created_at, monthly_income, kyc_status, is_email_verified, is_phone_verified FROM users WHERE id = $1`, [userId]),
+    query(`SELECT balance, blocked_balance, credit_limit, credit_used, created_at FROM accounts WHERE user_id = $1 AND is_active = true`, [userId]),
+    query(`SELECT status, days_overdue, is_blacklisted, current_amount FROM debts WHERE user_id = $1`, [userId]),
     query(`
-      SELECT t.type, t.direction, t.status, t.created_at
+      SELECT t.type, t.direction, t.status, t.amount, t.created_at
       FROM transactions t
       JOIN accounts a ON t.account_id = a.id
-      WHERE a.user_id = $1 AND t.created_at > NOW() - INTERVAL '24 months'
+      WHERE a.user_id = $1 AND t.created_at > NOW() - INTERVAL '12 months'
       ORDER BY t.created_at DESC
-      LIMIT 200
+      LIMIT 300
     `, [userId]),
-    query(`SELECT status, COALESCE(shared_score, 0) AS shared_score FROM open_finance_consents WHERE user_id = $1`, [userId]),
+    query(`
+      SELECT status, COALESCE(shared_score, 0) AS shared_score,
+             COALESCE(shared_debt, 0) AS shared_debt,
+             COALESCE(shared_income, 0) AS shared_income
+      FROM open_finance_consents
+      WHERE user_id = $1 AND status = 'active'
+    `, [userId]),
   ]);
 
-  let paymentScore = 1.0;
-  const activeDebts = debtRows.rows.filter((d) => ['overdue', 'pending', 'negotiating'].includes(d.status));
-  const blacklisted = debtRows.rows.filter((d) => d.is_blacklisted || (d.status === 'overdue' && Number(d.days_overdue || 0) > 30));
-  paymentScore -= blacklisted.length * 0.35;
-  paymentScore -= activeDebts.length * 0.12;
-  paymentScore = Math.max(0, Math.min(1, paymentScore));
+  const user = userRow.rows[0] || {};
+  const accounts = accountRows.rows;
+  const debts = debtRows.rows;
+  const txs = txRows.rows.filter((t) => t.status === 'completed' || !t.status);
+  const consents = consentRows.rows;
 
-  const totalLimit = accountRows.rows.reduce((sum, acc) => sum + Number(acc.credit_limit || 0), 0);
-  const totalUsed = accountRows.rows.reduce((sum, acc) => sum + Number(acc.credit_used || 0), 0);
-  let usageScore = 1.0;
+  const totalBalance = accounts.reduce((sum, acc) => sum + money(acc.balance) - money(acc.blocked_balance), 0);
+  const totalLimit = accounts.reduce((sum, acc) => sum + money(acc.credit_limit), 0);
+  const totalUsed = accounts.reduce((sum, acc) => sum + money(acc.credit_used), 0);
+  const monthlyIncome = money(user.monthly_income) || money(consents.find((c) => money(c.shared_income) > 0)?.shared_income);
+
+  const openDebts = debts.filter((d) => ['pending', 'overdue', 'negotiating'].includes(String(d.status || '').toLowerCase()));
+  const overdueDebts = debts.filter((d) => String(d.status || '').toLowerCase() === 'overdue' || Number(d.days_overdue || 0) > 0);
+  const blacklisted = debts.filter((d) => d.is_blacklisted || Number(d.days_overdue || 0) >= 30);
+  const internalDebt = openDebts.reduce((sum, d) => sum + money(d.current_amount), 0);
+  const externalDebt = consents.reduce((sum, c) => sum + money(c.shared_debt), 0);
+  const totalDebt = internalDebt + externalDebt;
+
+  // 1) Histórico de pagamento: principal fator. Dívidas e negativação derrubam forte.
+  let paymentHistory = 1;
+  paymentHistory -= overdueDebts.length * 0.18;
+  paymentHistory -= blacklisted.length * 0.32;
+  if (totalDebt > 0 && monthlyIncome > 0) paymentHistory -= clamp(totalDebt / Math.max(monthlyIncome * 4, 1), 0, 0.35);
+  paymentHistory = clamp(paymentHistory);
+
+  // 2) Uso de crédito: usar muito limite derruba, uso saudável melhora.
+  let creditUsage = 0.62;
   if (totalLimit > 0) {
-    const usageRatio = totalUsed / totalLimit;
-    if (usageRatio >= 0.9) usageScore = 0.1;
-    else if (usageRatio >= 0.7) usageScore = 0.35;
-    else if (usageRatio >= 0.5) usageScore = 0.55;
-    else if (usageRatio >= 0.3) usageScore = 0.75;
+    const ratio = totalUsed / totalLimit;
+    if (ratio <= 0.1) creditUsage = 0.95;
+    else if (ratio <= 0.3) creditUsage = 0.88;
+    else if (ratio <= 0.5) creditUsage = 0.72;
+    else if (ratio <= 0.7) creditUsage = 0.52;
+    else if (ratio <= 0.9) creditUsage = 0.32;
+    else creditUsage = 0.14;
   }
 
-  let ageScore = 0.10;
-  if (userRow.rows[0]) {
-    const monthsOld = (Date.now() - new Date(userRow.rows[0].created_at).getTime()) / (1000 * 60 * 60 * 24 * 30);
-    if (monthsOld >= 60) ageScore = 1.0;
-    else if (monthsOld >= 36) ageScore = 0.85;
-    else if (monthsOld >= 24) ageScore = 0.70;
-    else if (monthsOld >= 12) ageScore = 0.50;
-    else if (monthsOld >= 6) ageScore = 0.30;
-  }
+  // 3) Capacidade financeira: renda declarada + colchão em conta.
+  const incomeScore = scoreFromIncome(monthlyIncome);
+  const reserveMonths = monthlyIncome > 0 ? totalBalance / monthlyIncome : 0;
+  const reserveScore = clamp(reserveMonths / 3, 0.15, 1);
+  const financialCapacity = clamp(incomeScore * 0.7 + reserveScore * 0.3);
 
-  const txTypes = new Set(txRows.rows.map((t) => t.type));
-  const mixScore = Math.min(1.0, txTypes.size * 0.2);
+  // 4) Idade/relacionamento bancário.
+  const createdDates = [user.created_at, ...accounts.map((a) => a.created_at)].filter(Boolean).map((d) => new Date(d).getTime());
+  const oldest = createdDates.length ? Math.min(...createdDates) : Date.now();
+  const monthsOld = (Date.now() - oldest) / (1000 * 60 * 60 * 24 * 30);
+  const creditAge = clamp(monthsOld / 48, 0.15, 1);
 
-  const recentDebits = txRows.rows.filter((t) =>
-    t.direction === 'debit' &&
-    new Date(t.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000
-  ).length;
-  const inquiryScore = Math.max(0, 1.0 - recentDebits * 0.05);
+  // 5) Movimentação real: entradas, saídas, diversidade e conta verificada.
+  const credits = txs.filter((t) => t.direction === 'credit');
+  const debits = txs.filter((t) => t.direction === 'debit');
+  const txTypes = new Set(txs.map((t) => t.type).filter(Boolean));
+  const volumeCredit = credits.reduce((sum, t) => sum + money(t.amount), 0);
+  const volumeDebit = debits.reduce((sum, t) => sum + money(t.amount), 0);
+  const movementCountScore = clamp(txs.length / 60, 0.2, 1);
+  const flowScore = volumeCredit > 0 ? clamp((volumeCredit - volumeDebit * 0.75) / Math.max(volumeCredit, 1), 0.25, 1) : 0.35;
+  const mixScore = clamp(txTypes.size / 5, 0.2, 1);
+  const verificationBonus = (user.kyc_status === 'approved' ? 0.04 : 0) + (user.is_email_verified ? 0.02 : 0) + (user.is_phone_verified ? 0.02 : 0);
+  const bankingBehavior = clamp(movementCountScore * 0.35 + flowScore * 0.35 + mixScore * 0.22 + verificationBonus);
 
-  const activeConsents = consentRows.rows.filter((c) => c.status === 'active').length;
-  const openFinanceBonus = Math.min(0.10, activeConsents * 0.02);
+  // Score local ponderado.
+  const localScore = Math.round(MAX_SCORE * clamp(
+    paymentHistory * 0.35 +
+    creditUsage * 0.22 +
+    financialCapacity * 0.18 +
+    creditAge * 0.10 +
+    bankingBehavior * 0.15
+  ));
 
-  const rawScore =
-    paymentScore * WEIGHTS.payment_history +
-    usageScore * WEIGHTS.credit_usage +
-    ageScore * WEIGHTS.credit_age +
-    mixScore * WEIGHTS.credit_mix +
-    inquiryScore * WEIGHTS.new_inquiries +
-    openFinanceBonus;
-
-  const localScore = Math.round(Math.min(1, rawScore) * MAX_SCORE);
-
-  // Score externo influencia de verdade: 65% score local + 35% média dos scores externos.
-  // Assim, um banco parceiro com score alto ajuda; com score baixo derruba.
-  const externalScores = consentRows.rows
-    .filter((c) => c.status === 'active' && Number(c.shared_score || 0) > 0)
-    .map((c) => Number(c.shared_score));
+  // Open Finance influencia de verdade: média ponderada dos scores externos ativos.
+  const externalScores = consents
+    .map((c) => Number(c.shared_score || 0))
+    .filter((v) => Number.isFinite(v) && v > 0 && v <= 1000);
   const avgExternalScore = externalScores.length
     ? externalScores.reduce((sum, value) => sum + value, 0) / externalScores.length
     : 0;
+
   const finalScore = externalScores.length
     ? Math.round(localScore * 0.65 + avgExternalScore * 0.35)
     : localScore;
@@ -104,21 +152,38 @@ export async function calculateAndSaveScore(userId) {
       user_id, score, payment_history, credit_usage,
       credit_age, credit_mix, new_inquiries, open_finance_data
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-  `, [userId, finalScore, paymentScore, usageScore, ageScore, mixScore, inquiryScore, activeConsents > 0]);
+  `, [
+    userId,
+    Math.max(0, Math.min(1000, finalScore)),
+    paymentHistory,
+    creditUsage,
+    creditAge,
+    bankingBehavior,
+    financialCapacity,
+    externalScores.length > 0,
+  ]);
 
   return {
-    score: finalScore,
-    factors: {
-      payment_history: Math.round(paymentScore * 100),
-      credit_usage: Math.round(usageScore * 100),
-      credit_age: Math.round(ageScore * 100),
-      credit_mix: Math.round(mixScore * 100),
-      new_inquiries: Math.round(inquiryScore * 100),
-    },
-    classification: getClassification(finalScore),
-    open_finance_bonus: Math.round(openFinanceBonus * MAX_SCORE),
+    score: Math.max(0, Math.min(1000, finalScore)),
     local_score: localScore,
     external_score_average: Math.round(avgExternalScore || 0),
+    open_finance_data: externalScores.length > 0,
+    indicators: {
+      monthly_income: monthlyIncome,
+      available_balance: totalBalance,
+      credit_limit: totalLimit,
+      credit_used: totalUsed,
+      active_debt: totalDebt,
+      transaction_count_12m: txs.length,
+    },
+    factors: {
+      payment_history: Math.round(paymentHistory * 100),
+      credit_usage: Math.round(creditUsage * 100),
+      credit_age: Math.round(creditAge * 100),
+      credit_mix: Math.round(bankingBehavior * 100),
+      new_inquiries: Math.round(financialCapacity * 100),
+    },
+    classification: getClassification(finalScore),
   };
 }
 
@@ -135,34 +200,10 @@ scoreRouter.use(authenticate);
 
 scoreRouter.get('/', async (req, res) => {
   try {
-    const { rows } = await query(
-      `SELECT score, payment_history, credit_usage, credit_age,
-              credit_mix, new_inquiries, open_finance_data, calculated_at
-       FROM credit_score_history
-       WHERE user_id = $1
-       ORDER BY calculated_at DESC
-       LIMIT 1`,
-      [req.user.id]
-    );
-
-    if (!rows[0]) return res.json(await calculateAndSaveScore(req.user.id));
-
-    const s = rows[0];
-    return res.json({
-      score: s.score,
-      factors: {
-        payment_history: Math.round(Number(s.payment_history || 0) * 100),
-        credit_usage: Math.round(Number(s.credit_usage || 0) * 100),
-        credit_age: Math.round(Number(s.credit_age || 0) * 100),
-        credit_mix: Math.round(Number(s.credit_mix || 0) * 100),
-        new_inquiries: Math.round(Number(s.new_inquiries || 0) * 100),
-      },
-      classification: getClassification(s.score),
-      open_finance_data: s.open_finance_data,
-      calculated_at: s.calculated_at,
-    });
+    // Sempre recalcula ao abrir para refletir saldo, dívidas, extrato e Open Finance atuais.
+    return res.json(await calculateAndSaveScore(req.user.id));
   } catch (err) {
-    console.error('Erro ao buscar score:', err);
+    console.error('Erro ao buscar/recalcular score:', err);
     return res.status(500).json({ error: 'Erro ao buscar score' });
   }
 });

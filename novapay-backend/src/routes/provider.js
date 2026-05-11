@@ -17,7 +17,7 @@ import { calculateAndSaveScore } from './score.js';
 
 const router = Router();
 const AUTH_CODE_TTL_MINUTES = 10;
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 365; // MVP: token acompanha consentimento anual
 
 function firstDefined(...values) {
   return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '');
@@ -502,53 +502,109 @@ router.get('/provider/accounts', authenticateProviderToken, async (req, res) => 
     const estimatedIncome = Number(req.providerAccess.monthly_income || 0);
     const currentScore = Number(score?.score ?? score?.currentScore ?? score?.value ?? 0);
 
-    // Contrato compatível com Deas Finance e outros bancos:
-    // 1) mantém arrays detalhados; 2) expõe campos planos; 3) expõe summary.
-    return res.json({
+    const payload = {
       ok: true,
       provider: 'DEASPay',
+      bank: 'DEASPay',
+      institution: 'DEASPay',
       client_id: req.providerAccess.client_id,
+      generatedAt: new Date().toISOString(),
       user: {
         id: userId,
         name: req.providerAccess.full_name,
+        fullName: req.providerAccess.full_name,
         cpf: req.providerAccess.cpf,
+        document: req.providerAccess.cpf,
         email: req.providerAccess.email,
         phone: req.providerAccess.phone,
+        monthlyIncome: estimatedIncome,
+        monthly_income: estimatedIncome,
         estimatedIncome,
       },
 
-      // Campos planos usados pelo Deas Finance
+      // Campos planos usados por Deas Finance e por outros bancos.
       availableBalance: totalAvailableBalance,
+      balanceAvailable: totalAvailableBalance,
+      externalBalance: totalAvailableBalance,
       saldoDisponivel: totalAvailableBalance,
+      saldo_disponivel: totalAvailableBalance,
+      balance: totalAvailableBalance,
+
       debt: totalDebtAmount,
+      externalDebt: totalDebtAmount,
       totalDebt: totalDebtAmount,
+      totalDebtAmount,
+      divida: totalDebtAmount,
+      dividas: totalDebtAmount,
+
       limit: totalCreditLimit,
+      externalLimit: totalCreditLimit,
       creditLimit: totalCreditLimit,
+      totalCreditLimit,
+      limite: totalCreditLimit,
       creditUsed: totalCreditUsed,
+      creditAvailable: Math.max(0, totalCreditLimit - totalCreditUsed),
+
       loans: 0,
       investments: 0,
       estimatedIncome,
       income: estimatedIncome,
+      rendaEstimada: estimatedIncome,
+      renda_estimada: estimatedIncome,
+      monthlyIncome: estimatedIncome,
+      monthly_income: estimatedIncome,
+
       externalScore: currentScore,
       creditScore: currentScore,
+      scoreValue: currentScore,
+      currentScore,
 
-      // Dados detalhados
+      // Dados detalhados.
       account: accounts[0] || null,
       accounts,
       score,
+      scoreData: score,
+      creditScoreData: score,
       debts,
       inadimplencias: debts,
       transactions,
+      extrato: transactions,
       summary: {
         totalAvailableBalance,
+        availableBalance: totalAvailableBalance,
+        saldoDisponivel: totalAvailableBalance,
         totalCreditLimit,
+        creditLimit: totalCreditLimit,
         totalCreditUsed,
         totalDebtAmount,
+        totalDebt: totalDebtAmount,
         blacklistedDebts: debts.filter((debt) => debt.isBlacklisted).length,
         estimatedIncome,
+        income: estimatedIncome,
         externalScore: currentScore,
+        creditScore: currentScore,
+        accountsCount: accounts.length,
+        transactionsCount: transactions.length,
+        debtsCount: debts.length,
       },
-    });
+      shareDebug: {
+        hasAccounts: accounts.length > 0,
+        accountsCount: accounts.length,
+        transactionsCount: transactions.length,
+        debtsCount: debts.length,
+        tokenClientId: req.providerAccess.client_id,
+      },
+    };
+
+    // Compatibilidade extra: alguns adaptadores esperam raw.data.*.
+    payload.data = {
+      ...payload,
+      // evita recursão infinita dentro de data
+      data: undefined,
+    };
+
+    res.set('Cache-Control', 'no-store');
+    return res.json(payload);;
   } catch (err) {
     console.error('Erro em /provider/accounts:', err);
     return res.status(500).json({ error: 'server_error', error_description: 'Erro ao expor contas do usuário.' });
