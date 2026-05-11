@@ -152,7 +152,9 @@ function collectOauthParams(req) {
 }
 
 function renderConsentForm(req, res, message = '') {
-  const action = req.originalUrl.split('?')[0];
+  // IMPORTANTE: action vazio + JS abaixo faz o navegador enviar o POST para a URL atual completa,
+  // incluindo a query string original do Deas Finance (client_id, redirect_uri, state etc.).
+  // Isso evita perder os parâmetros OAuth em rewrites da Vercel.
   const hiddenOauthFields = collectOauthParams(req);
 
   res.status(200).type('html').send(`<!doctype html>
@@ -176,7 +178,7 @@ function renderConsentForm(req, res, message = '') {
     <h1>Autorizar compartilhamento</h1>
     <p>Entre com sua conta DEASPay para liberar saldo, score, extrato e inadimplências para o banco solicitante. Se ainda não tem conta, cadastre-se primeiro no DEASPay.</p>
     ${message ? `<div class="msg">${message}</div>` : ''}
-    <form method="POST" action="${action}">
+    <form id="authorize-form" method="POST" action="" onsubmit="this.action = window.location.href; const b=this.querySelector('button[type=submit]'); b.disabled=true; b.textContent='Autorizando...';">
       ${hiddenOauthFields}
       <label for="identifier">E-mail ou CPF</label>
       <input id="identifier" name="identifier" placeholder="seuemail@exemplo.com ou 000.000.000-00" required />
