@@ -1,0 +1,32 @@
+{
+  "name": "deaspay",
+  "version": "1.0.1",
+  "description": "DEASPay com frontend e backend Express na Vercel",
+  "type": "module",
+  "main": "novapay-backend/src/server.js",
+  "scripts": {
+    "start": "node novapay-backend/src/server.js",
+    "dev": "node --watch novapay-backend/src/server.js",
+    "db:migrate": "node novapay-backend/src/database/migrate.js",
+    "db:seed": "node novapay-backend/src/database/seed.js",
+    "db:reset": "node novapay-backend/src/database/migrate.js --reset && node novapay-backend/src/database/seed.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.3",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "express-validator": "^7.1.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.12.0",
+    "uuid": "^10.0.0",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}

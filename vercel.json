@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "novapay-backend/src/server.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "novapay-backend/src/server.js" }
+  ]
+}
