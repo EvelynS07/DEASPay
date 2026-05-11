@@ -23,6 +23,33 @@ function appBaseUrl(req) {
   ).replace(/\/$/, '');
 }
 
+function callbackUrlForProvider(req, providerName = '') {
+  const base = appBaseUrl(req);
+  const p = String(providerName || '').toLowerCase();
+
+  // Alguns projetos parceiros registram callbacks diferentes.
+  // Para o Larabank, deixe configurável na Vercel e use a rota sem /api por padrão,
+  // porque alguns OAuth providers redirecionam para a página inicial quando o callback
+  // não bate exatamente com o cadastrado. As duas rotas funcionam no DEASPay.
+  if (p === 'larabank') {
+    return (
+      process.env.LARABANK_REDIRECT_URI ||
+      process.env.LARABANK_CALLBACK_URL ||
+      `${base}/open-finance/callback`
+    ).replace(/\/$/, '');
+  }
+
+  if (p === 'deasfinance') {
+    return (
+      process.env.DEASFINANCE_REDIRECT_URI ||
+      process.env.DEASFINANCE_CALLBACK_URL ||
+      `${base}/api/open-finance/callback`
+    ).replace(/\/$/, '');
+  }
+
+  return `${base}/api/open-finance/callback`;
+}
+
 function asMoneyNumber(value) {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
@@ -209,12 +236,17 @@ router.post('/consent', authenticate, [
 
     // Bancos com OAuth real: redireciona para o banco parceiro autorizar.
     if (provider?.authUrl && provider?.clientId) {
-      const redirectUri = `${appBaseUrl(req)}/api/open-finance/callback`;
+      const redirectUri = callbackUrlForProvider(req, provider.provider);
       const url = new URL(provider.authUrl);
+      // Envia nos dois padrões porque o Larabank e outros projetos podem esperar
+      // snake_case ou camelCase. Isso evita cair na página inicial por parâmetro ausente.
       url.searchParams.set('client_id', provider.clientId);
+      url.searchParams.set('clientId', provider.clientId);
       url.searchParams.set('redirect_uri', redirectUri);
+      url.searchParams.set('redirectUri', redirectUri);
       url.searchParams.set('response_type', 'code');
-      url.searchParams.set('scope', 'accounts balances transactions score debts customers_personal');
+      url.searchParams.set('responseType', 'code');
+      url.searchParams.set('scope', provider.provider === 'larabank' ? 'accounts balances transactions score debts' : 'accounts balances transactions score debts customers_personal');
       url.searchParams.set('state', state);
       return res.status(200).json({
         message: `Redirecionando para autorização no ${inst.name}`,
@@ -270,7 +302,7 @@ router.get('/callback', async (req, res) => {
       return res.status(400).type('html').send('Provider não configurado para esta instituição.');
     }
 
-    const redirectUri = `${base}/api/open-finance/callback`;
+    const redirectUri = callbackUrlForProvider(req, provider.provider);
     const tokenResp = await fetch(provider.tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

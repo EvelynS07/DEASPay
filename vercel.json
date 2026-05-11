@@ -1,11 +1,33 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/[...path].js" },
-    { "src": "/health", "dest": "/api/health.js" },
-    { "src": "/authorize", "dest": "/api/[...path].js" },
-    { "src": "/token", "dest": "/api/[...path].js" },
-    { "src": "/provider/(.*)", "dest": "/api/[...path].js" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/[...path].js"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "/authorize",
+      "dest": "/api/[...path].js"
+    },
+    {
+      "src": "/token",
+      "dest": "/api/[...path].js"
+    },
+    {
+      "src": "/provider/(.*)",
+      "dest": "/api/[...path].js"
+    },
+    {
+      "src": "/open-finance/(.*)",
+      "dest": "/api/[...path].js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }

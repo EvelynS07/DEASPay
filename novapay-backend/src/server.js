@@ -109,6 +109,8 @@ app.use('/api/accounts', accountsRouter);
 app.use('/api/score', scoreRouter);
 app.use('/api/debts', debtsRouter);
 app.use('/api/open-finance', openFinanceRouter);
+// Alias para callbacks OAuth sem /api, usado por alguns bancos parceiros.
+app.use('/open-finance', openFinanceRouter);
 
 // Provedor OAuth/Open Finance para outros bancos.
 // Caminhos exatos pedidos: /authorize, /token, /provider/accounts
