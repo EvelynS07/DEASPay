@@ -98,19 +98,21 @@ router.post('/register', registerValidators, async (req, res) => {
 
 // ── POST /auth/login ──────────────────────────────────────────
 router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty(),
+  body('email').trim().notEmpty().withMessage('Informe e-mail ou CPF'),
+  body('password').notEmpty().withMessage('Informe a senha'),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { email, password } = req.body;
+  const login = String(req.body.email || '').trim();
+  const { password } = req.body;
 
   try {
     const { rows } = await query(
       `SELECT id, full_name, email, password_hash, is_active, plan, kyc_status
-       FROM users WHERE email = $1`,
-      [email]
+       FROM users
+       WHERE lower(email) = lower($1) OR cpf = $1`,
+      [login]
     );
 
     const user = rows[0];

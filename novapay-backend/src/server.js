@@ -10,6 +10,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import authRouter from './routes/auth.js';
 import accountsRouter from './routes/accounts.js';
@@ -19,6 +22,9 @@ import openFinanceRouter from './routes/openFinance.js';
 import providerRouter from './routes/provider.js';
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendIndex = path.resolve(__dirname, '../../index.html');
 const PORT = process.env.PORT || 3001;
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -54,6 +60,11 @@ app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
+
+app.get('/', (req, res, next) => {
+  if (fs.existsSync(frontendIndex)) return res.sendFile(frontendIndex);
+  return next();
+});
 
 app.get('/health', (req, res) => {
   res.json({

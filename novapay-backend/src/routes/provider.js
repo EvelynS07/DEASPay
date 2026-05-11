@@ -10,6 +10,7 @@
 
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { query } from '../database/connection.js';
 import { calculateAndSaveScore } from './score.js';
@@ -144,12 +145,14 @@ function renderConsentForm(req, res, message = '') {
 <body>
   <main>
     <h1>Autorizar compartilhamento</h1>
-    <p>Informe o e-mail ou CPF da sua conta DEASPay para liberar saldo, score, extrato e inadimplências para o banco solicitante.</p>
+    <p>Entre com sua conta DEASPay para liberar saldo, score, extrato e inadimplências para o banco solicitante. Se ainda não tem conta, cadastre-se primeiro no DEASPay.</p>
     ${message ? `<div class="msg">${message}</div>` : ''}
     <form method="GET" action="${action}">
       <label for="identifier">E-mail ou CPF</label>
       <input id="identifier" name="identifier" placeholder="seuemail@exemplo.com ou 000.000.000-00" required />
-      <button type="submit">Autorizar e continuar</button>
+      <label for="password">Senha DEASPay</label>
+      <input id="password" name="password" type="password" placeholder="••••••••" required />
+      <button type="submit">Entrar, autorizar e continuar</button>
     </form>
     <small>O código gerado expira em ${AUTH_CODE_TTL_MINUTES} minutos e só pode ser trocado uma vez por token.</small>
   </main>
@@ -157,17 +160,22 @@ function renderConsentForm(req, res, message = '') {
 </html>`);
 }
 
-async function resolveUserFromIdentifier(identifier) {
-  if (!identifier) return null;
+async function resolveUserFromIdentifier(identifier, password) {
+  if (!identifier || !password) return null;
   const value = String(identifier).trim();
   const isEmail = value.includes('@');
   const { rows } = await query(
     isEmail
-      ? `SELECT id, full_name, cpf, email, phone FROM users WHERE lower(email) = lower($1) AND is_active = true`
-      : `SELECT id, full_name, cpf, email, phone FROM users WHERE cpf = $1 AND is_active = true`,
+      ? `SELECT id, full_name, cpf, email, phone, password_hash FROM users WHERE lower(email) = lower($1) AND is_active = true`
+      : `SELECT id, full_name, cpf, email, phone, password_hash FROM users WHERE cpf = $1 AND is_active = true`,
     [value]
   );
-  return rows[0] || null;
+  const user = rows[0];
+  if (!user) return null;
+  const validPassword = await bcrypt.compare(password, user.password_hash);
+  if (!validPassword) return null;
+  delete user.password_hash;
+  return user;
 }
 
 // GET /authorize — início do fluxo OAuth2 Authorization Code.
@@ -195,11 +203,11 @@ router.get('/authorize', async (req, res) => {
   }
 
   try {
-    const identifierUser = await resolveUserFromIdentifier(req.query.identifier);
+    const identifierUser = await resolveUserFromIdentifier(req.query.identifier, req.query.password);
     const user = identifierUser || await resolveUserForAuthorization(req);
 
     if (!user) {
-      return renderConsentForm(req, res, req.query.identifier ? 'Usuário não encontrado ou inativo.' : '');
+      return renderConsentForm(req, res, req.query.identifier ? 'Usuário/senha inválidos ou conta inativa.' : '');
     }
 
     const code = `deaspay_code_${randomUUID()}`;

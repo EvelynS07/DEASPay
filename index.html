@@ -608,11 +608,11 @@
       <div class="form-subtitle">Acesse sua conta com segurança</div>
       <div class="field-group">
         <label>E-mail ou CPF</label>
-        <input type="text" id="login-email" placeholder="seuemail@exemplo.com" />
+        <input type="text" id="login-email" placeholder="seuemail@exemplo.com ou 000.000.000-00" autocomplete="username" />
       </div>
       <div class="field-group">
         <label>Senha</label>
-        <input type="password" id="login-pass" placeholder="••••••••" />
+        <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password" />
       </div>
       <div class="terms-checkbox-container">
         <input type="checkbox" id="acceptTermsLogin">
@@ -661,8 +661,8 @@
           <select id="reg-job"><option value="">Selecionar</option><option>CLT</option><option>Autônomo / MEI</option><option>Empresário</option><option>Servidor Público</option><option>Aposentado</option><option>Estudante</option><option>Desempregado</option></select>
         </div>
       </div>
-      <div class="field-group"><label>Senha</label><input type="password" id="reg-pass" placeholder="Mínimo 8 caracteres" /></div>
-      <div class="field-group"><label>Confirmar senha</label><input type="password" id="reg-pass2" placeholder="Repita a senha" /></div>
+      <div class="field-group"><label>Senha</label><input type="password" id="reg-pass" placeholder="Mínimo 8 caracteres" autocomplete="new-password" /></div>
+      <div class="field-group"><label>Confirmar senha</label><input type="password" id="reg-pass2" placeholder="Repita a senha" autocomplete="new-password" /></div>
       <div class="terms-checkbox-container">
         <input type="checkbox" id="acceptTermsReg">
         <label for="acceptTermsReg">Aceito os <a href="#" onclick="openTermsModal(event)" class="terms-link">termos de uso e privacidade</a>.</label>
@@ -1149,39 +1149,23 @@
       <div id="page-openfinance" class="section-page">
         <div class="of-hero">
           <h2>Open Finance</h2>
-          <p>Conecte instituições financeiras, compartilhe seus dados com consentimento e acesse uma visão unificada de toda a sua vida financeira.</p>
+          <p>Peça conexão apenas a bancos reais cadastrados na API do DEASPay. Nada aqui é automático: o usuário precisa autorizar cada instituição.</p>
           <div class="of-hero-btns">
-            <button class="of-btn-primary">Conectar instituição</button>
-            <button class="of-btn-sec">Gerenciar consentimentos</button>
+            <button class="of-btn-primary" onclick="loadOpenFinance(true)">Atualizar bancos</button>
+            <button class="of-btn-sec" onclick="loadOpenFinance(true)">Gerenciar consentimentos</button>
           </div>
         </div>
         <div class="panel">
-          <div class="panel-header"><div class="panel-title">Instituições conectadas</div></div>
+          <div class="panel-header"><div class="panel-title">Pedir conexão aos bancos</div></div>
           <div class="panel-body">
-            <div class="of-institutions">
+            <p style="color:#8a8090;margin-bottom:16px;font-size:14px;">Selecione uma instituição real abaixo para criar uma solicitação de consentimento. Bancos fictícios foram removidos.</p>
+            <div id="of-request-status" style="display:none;margin-bottom:14px;padding:12px;border-radius:12px;background:#fff4f7;color:#9e3157;font-size:13px;"></div>
+            <div class="of-institutions" id="of-institutions-list">
               <div class="of-institution-item">
-                <div class="of-inst-logo"><svg viewBox="0 0 24 24" style="color:#0066cc"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
                 <div class="of-inst-info">
-                  <div class="of-inst-name">Banco do Brasil</div>
-                  <div class="of-inst-status">Saldo, extrato e Pix compartilhados • Conectado em 01/04/2026</div>
+                  <div class="of-inst-name">Carregando instituições...</div>
+                  <div class="of-inst-status">Aguarde enquanto buscamos os bancos disponíveis na API.</div>
                 </div>
-                <div class="of-toggle on"></div>
-              </div>
-              <div class="of-institution-item">
-                <div class="of-inst-logo"><svg viewBox="0 0 24 24" style="color:#ff6600"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-                <div class="of-inst-info">
-                  <div class="of-inst-name">Nubank</div>
-                  <div class="of-inst-status">Cartão e fatura compartilhados • Conectado em 15/03/2026</div>
-                </div>
-                <div class="of-toggle on"></div>
-              </div>
-              <div class="of-institution-item">
-                <div class="of-inst-logo"><svg viewBox="0 0 24 24" style="color:#e8a000"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
-                <div class="of-inst-info">
-                  <div class="of-inst-name">Itaú Unibanco</div>
-                  <div class="of-inst-status">Compartilhamento pausado pelo usuário</div>
-                </div>
-                <div class="of-toggle"></div>
               </div>
             </div>
           </div>
@@ -1352,7 +1336,37 @@
     `).join('');
   }
 
-  // ===== AUTH =====
+  // ===== API REAL / AUTH =====
+  const API_BASE = window.DEASPAY_API_BASE || localStorage.getItem('DEASPAY_API_BASE') || '';
+
+  function getToken() { return localStorage.getItem('deaspay_token'); }
+  function setSession(data) {
+    if (data?.token) localStorage.setItem('deaspay_token', data.token);
+    if (data?.refresh_token) localStorage.setItem('deaspay_refresh_token', data.refresh_token);
+  }
+  function clearSession() {
+    localStorage.removeItem('deaspay_token');
+    localStorage.removeItem('deaspay_refresh_token');
+  }
+  function money(value) {
+    return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+  function showMessage(message) { alert(message); }
+
+  async function apiFetch(path, options = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(API_BASE + path, { ...options, headers });
+    let data = null;
+    try { data = await response.json(); } catch {}
+    if (!response.ok) {
+      const errorMsg = data?.error || data?.message || data?.errors?.[0]?.msg || `Erro HTTP ${response.status}`;
+      throw new Error(errorMsg);
+    }
+    return data;
+  }
+
   function switchTab(tab) {
     document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
     document.getElementById('login-panel').classList.toggle('active', tab==='login');
@@ -1381,38 +1395,208 @@
     el.value = v.slice(0,9);
   }
 
-  function doLogin() {
-    const email = document.getElementById('login-email').value || 'usuario@deaspay.com';
-    userData = {
-      name: 'Ana Carolina Silva', email: email,
-      cpf: '123.456.789-00', phone: '(81) 99999-1234',
-      addr: 'Rua das Flores, 42, Centro, São Lourenço da Mata - PE',
-      gender: 'Feminino', income: 'R$ 3.000 – R$ 7.000', job: 'CLT',
-    };
-    showDashboard();
+  function mapGender(value) {
+    const v = String(value || '').toLowerCase();
+    if (v.includes('masculino')) return 'masculino';
+    if (v.includes('feminino')) return 'feminino';
+    if (v.includes('bin')) return 'nao_binario';
+    return 'nao_informado';
   }
 
-  function doRegister() {
-    const name = document.getElementById('reg-name').value;
-    const lname = document.getElementById('reg-lname').value;
-    const email = document.getElementById('reg-email').value;
-    if (!name || !email) { alert('Preencha nome e e-mail para continuar.'); return; }
+  function parseIncome(value) {
+    const v = String(value || '');
+    if (v.includes('1.500 – R$ 3.000')) return 2500;
+    if (v.includes('3.000 – R$ 7.000')) return 5000;
+    if (v.includes('7.000 – R$ 15.000')) return 10000;
+    if (v.includes('Acima')) return 16000;
+    if (v.includes('Até')) return 1500;
+    return null;
+  }
+
+  async function doLogin() {
+    const login = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-pass').value;
+    if (!login || !password) return showMessage('Informe e-mail/CPF e senha.');
+    if (!document.getElementById('acceptTermsLogin').checked) return showMessage('Aceite os termos para continuar.');
+    try {
+      const data = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: login, password })
+      });
+      setSession(data);
+      await loadRealUserAndDashboard();
+    } catch (err) {
+      showMessage('Erro ao entrar: ' + err.message);
+    }
+  }
+
+  async function doRegister() {
+    const name = document.getElementById('reg-name').value.trim();
+    const lname = document.getElementById('reg-lname').value.trim();
+    const password = document.getElementById('reg-pass').value;
+    const password2 = document.getElementById('reg-pass2').value;
+    if (!name || !lname) return showMessage('Preencha nome e sobrenome.');
+    if (!document.getElementById('reg-cpf').value) return showMessage('Preencha o CPF.');
+    if (!document.getElementById('reg-birth').value) return showMessage('Preencha a data de nascimento.');
+    if (!document.getElementById('reg-email').value) return showMessage('Preencha o e-mail.');
+    if (!document.getElementById('reg-phone').value) return showMessage('Preencha o telefone.');
+    if (!password || password !== password2) return showMessage('As senhas não conferem.');
+    if (!document.getElementById('acceptTermsReg').checked) return showMessage('Aceite os termos para criar a conta.');
+
+    const payload = {
+      full_name: `${name} ${lname}`.trim(),
+      cpf: document.getElementById('reg-cpf').value.trim(),
+      email: document.getElementById('reg-email').value.trim(),
+      phone: document.getElementById('reg-phone').value.trim(),
+      password,
+      date_of_birth: document.getElementById('reg-birth').value,
+      gender: mapGender(document.getElementById('reg-gender').value),
+      zip_code: document.getElementById('reg-cep').value.trim() || null,
+      street: document.getElementById('reg-addr').value.trim() || null,
+      city: null,
+      state: document.getElementById('reg-state').value || null,
+      monthly_income: parseIncome(document.getElementById('reg-income').value),
+      occupation: document.getElementById('reg-job').value || null,
+      employment_type: document.getElementById('reg-job').value || null,
+    };
+
+    try {
+      const data = await apiFetch('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      setSession(data);
+      await loadRealUserAndDashboard();
+    } catch (err) {
+      showMessage('Erro ao cadastrar: ' + err.message);
+    }
+  }
+
+  async function loadRealUserAndDashboard() {
+    const me = await apiFetch('/api/auth/me');
     userData = {
-      name: (name + ' ' + lname).trim() || 'Novo Usuário',
-      email: email, cpf: document.getElementById('reg-cpf').value || '—',
-      phone: document.getElementById('reg-phone').value || '—',
-      addr: document.getElementById('reg-addr').value || '—',
-      gender: document.getElementById('reg-gender').value || '—',
-      income: document.getElementById('reg-income').value || '—',
-      job: document.getElementById('reg-job').value || '—',
+      name: me.full_name,
+      email: me.email,
+      cpf: me.cpf,
+      phone: me.phone,
+      addr: [me.street, me.number, me.neighborhood, me.city, me.state].filter(Boolean).join(', ') || '—',
+      gender: me.gender || '—',
+      income: me.monthly_income ? money(me.monthly_income) : '—',
+      job: me.occupation || me.employment_type || '—',
     };
     showDashboard();
+    await Promise.allSettled([loadAccounts(), loadScore(), loadDebts(), loadOpenFinance(false)]);
+  }
+
+  async function loadAccounts() {
+    try {
+      const accounts = await apiFetch('/api/accounts');
+      const total = accounts.reduce((sum, acc) => sum + Number(acc.balance_available ?? acc.balance ?? 0), 0);
+      document.querySelectorAll('.sidebar-balance-amount').forEach(el => el.textContent = money(total));
+      const balanceEls = document.querySelectorAll('[data-balance], .balance-amount, .home-balance-amount');
+      balanceEls.forEach(el => el.textContent = money(total));
+
+      if (accounts[0]?.id) {
+        const txResult = await apiFetch(`/api/accounts/${accounts[0].id}/transactions?limit=20`);
+        const realTx = (txResult.data || []).map(tx => {
+          const value = Number(tx.amount || 0);
+          const isCredit = tx.direction === 'credit';
+          return {
+            name: tx.description || tx.counterpart_name || 'Movimentação',
+            date: new Date(tx.created_at || tx.processed_at || Date.now()).toLocaleDateString('pt-BR'),
+            amount: isCredit ? Math.abs(value) : -Math.abs(value),
+            type: isCredit ? 'credit' : 'debit',
+            cat: tx.category || tx.type || 'Conta',
+            icon: '<svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+            bg: isCredit ? 'rgba(62,207,142,0.1)' : 'rgba(224,92,110,0.08)',
+            color: isCredit ? '#2ea874' : '#b05'
+          };
+        });
+        if (realTx.length) {
+          transactions.splice(0, transactions.length, ...realTx);
+          renderTxList('tx-list-home', 5);
+          renderExtrato();
+        }
+      }
+    } catch {}
+  }
+
+  async function loadScore() {
+    try {
+      const score = await apiFetch('/api/score');
+      document.querySelectorAll('.score-ring-large-num, .score-number').forEach(el => el.textContent = score.score);
+      const title = document.querySelector('.score-hero-info h2');
+      const text = document.querySelector('.score-hero-info p');
+      if (title) title.textContent = `Perfil ${score.classification?.label || 'em análise'} — dados reais`;
+      if (text) text.textContent = 'Score calculado a partir de conta, crédito, transações, dívidas e consentimentos Open Finance reais do usuário.';
+    } catch {}
+  }
+
+  async function loadDebts() {
+    try {
+      const data = await apiFetch('/api/debts');
+      // O backend já retorna o resumo real. A página mantém o layout atual e deixa de usar Ana/demo.
+      window.deaspayDebtSummary = data.summary;
+    } catch {}
+  }
+
+  async function loadOpenFinance(showStatus = false) {
+    const box = document.getElementById('of-institutions-list');
+    const status = document.getElementById('of-request-status');
+    if (!box) return;
+    if (showStatus && status) { status.style.display = 'block'; status.textContent = 'Atualizando instituições...'; }
+    try {
+      const institutions = await apiFetch('/api/open-finance/institutions');
+      if (!institutions.length) {
+        box.innerHTML = `<div class="of-institution-item"><div class="of-inst-info"><div class="of-inst-name">Nenhum banco disponível</div><div class="of-inst-status">Cadastre bancos reais no seed ou no banco de dados.</div></div></div>`;
+        return;
+      }
+      box.innerHTML = institutions.map(inst => {
+        const active = inst.consent_status === 'active';
+        return `<div class="of-institution-item">
+          <div class="of-inst-logo"><span style="font-size:22px">${inst.logo_emoji || '🏦'}</span></div>
+          <div class="of-inst-info">
+            <div class="of-inst-name">${inst.name}</div>
+            <div class="of-inst-status">${active ? `Conectado • saldo compartilhado ${money(inst.shared_balance || 0)}` : 'Disponível para solicitar conexão real via Open Finance'}</div>
+          </div>
+          <button class="${active ? 'btn-outline' : 'btn-primary'}" style="width:auto;margin:0;min-width:150px" onclick="${active ? `syncInstitution('${inst.id}')` : `requestConsent('${inst.id}')`}">${active ? 'Sincronizar' : 'Pedir conexão'}</button>
+        </div>`;
+      }).join('');
+      if (showStatus && status) { status.style.display = 'block'; status.textContent = 'Instituições atualizadas.'; }
+    } catch (err) {
+      box.innerHTML = `<div class="of-institution-item"><div class="of-inst-info"><div class="of-inst-name">Erro ao carregar bancos</div><div class="of-inst-status">${err.message}</div></div></div>`;
+    }
+  }
+
+  async function requestConsent(institutionId) {
+    try {
+      const result = await apiFetch('/api/open-finance/consent', {
+        method: 'POST',
+        body: JSON.stringify({ institution_id: institutionId })
+      });
+      showMessage(result.message || 'Conexão solicitada/autorizada com sucesso.');
+      await loadOpenFinance(true);
+      await loadScore();
+    } catch (err) {
+      showMessage('Erro ao solicitar conexão: ' + err.message);
+    }
+  }
+
+  async function syncInstitution(institutionId) {
+    try {
+      const result = await apiFetch(`/api/open-finance/sync/${institutionId}`, { method: 'POST' });
+      showMessage(result.message || 'Sincronizado com sucesso.');
+      await loadOpenFinance(true);
+      await loadScore();
+    } catch (err) {
+      showMessage('Erro ao sincronizar: ' + err.message);
+    }
   }
 
   function showDashboard() {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    const firstName = userData.name.split(' ')[0];
+    const firstName = (userData.name || 'Usuário').split(' ')[0];
     const initial = firstName[0].toUpperCase();
     document.getElementById('topbar-avatar').textContent = initial;
     document.getElementById('profile-avatar-big').textContent = initial;
@@ -1447,6 +1631,7 @@
     if (page) page.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     if (el) el.classList.add('active');
+    if (id === 'openfinance') loadOpenFinance(false);
     document.getElementById('page-title').textContent = pageTitles[id] || id;
     closeSidebar();
   }
@@ -1463,6 +1648,7 @@
 
   function doLogout() {
     if (confirm('Deseja sair da sua conta?')) {
+      clearSession();
       document.getElementById('dashboard').style.display = 'none';
       document.getElementById('auth-screen').style.display = 'flex';
     }
@@ -1504,6 +1690,12 @@
       document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
       this.classList.add('active');
     });
+  });
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (getToken()) {
+      try { await loadRealUserAndDashboard(); } catch { clearSession(); }
+    }
   });
 </script>
 </body>
