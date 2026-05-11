@@ -1339,10 +1339,17 @@
   }
 
   // ===== API REAL / AUTH =====
-  // API fixa do backend real do DEASPay.
-  // Não usa window.location nem localStorage para evitar chamar GitHub Pages e gerar HTTP 405.
+  // Em deploy da Vercel, chama a API no MESMO domínio que abriu a página.
+  // Isso evita erro "Failed to fetch" por CORS em domínios preview tipo
+  // deas-pay-git-main-*.vercel.app. Fora da Vercel, cai para o domínio oficial.
   localStorage.removeItem('DEASPAY_API_BASE');
-  const API_BASE = 'https://deas-pay.vercel.app';
+  const DEASPAY_BUILD = 'vercel-same-origin-2026-05-11';
+  const API_BASE = (() => {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3001';
+    if (host === 'deas-pay.vercel.app' || host.endsWith('.vercel.app')) return window.location.origin;
+    return 'https://deas-pay.vercel.app';
+  })();
 
   function getToken() { return localStorage.getItem('deaspay_token'); }
   function setSession(data) {
@@ -1363,7 +1370,12 @@
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetch(url, { ...options, headers });
+    let response;
+    try {
+      response = await fetch(url, { ...options, headers, mode: 'cors' });
+    } catch (networkError) {
+      throw new Error(`Falha ao acessar a API em ${url}. Abra ${API_BASE}/api/health para testar o backend e faça redeploy sem cache.`);
+    }
     let data = null;
     try { data = await response.json(); } catch {}
     if (!response.ok) {

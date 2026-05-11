@@ -182,11 +182,24 @@ async function resolveUserFromIdentifier(identifier, password) {
 router.get('/authorize', async (req, res) => {
   const clientId = firstDefined(req.query.client_id, req.query.clientId);
   const redirectUri = firstDefined(req.query.redirect_uri, req.query.redirectUri);
-  const responseType = firstDefined(req.query.response_type, req.query.responseType);
+  // Alguns clientes OAuth/Open Finance enviam responseType, tipo ou até omitem response_type.
+  // Para compatibilidade com o Deas Finance, quando vier ausente assumimos Authorization Code.
+  const rawResponseType = firstDefined(req.query.response_type, req.query.responseType, req.query.type, 'code');
+  const responseType = String(rawResponseType).toLowerCase().trim();
   const scope = firstDefined(req.query.scope, 'accounts balances transactions score debts');
   const state = req.query.state;
 
-  if (responseType !== 'code') {
+  if (!['code', 'authorization_code'].includes(responseType)) {
+    // Em vez de quebrar o fluxo com uma tela JSON crua, devolve erro OAuth para o redirect_uri quando possível.
+    if (redirectUri) {
+      try {
+        return res.redirect(buildRedirectUrl(redirectUri, {
+          error: 'unsupported_response_type',
+          error_description: 'Use response_type=code.',
+          state,
+        }));
+      } catch {}
+    }
     return res.status(400).json({ error: 'unsupported_response_type', error_description: 'Use response_type=code.' });
   }
   if (!clientId || !redirectUri) {
@@ -227,7 +240,8 @@ router.get('/authorize', async (req, res) => {
 
 // POST /token — troca authorization_code por access_token.
 router.post('/token', async (req, res) => {
-  const grantType = firstDefined(req.body.grant_type, req.body.grantType);
+  // Compatibilidade: alguns clientes internos omitem grant_type. No fluxo de troca de code, assumimos authorization_code.
+  const grantType = String(firstDefined(req.body.grant_type, req.body.grantType, 'authorization_code')).toLowerCase().trim();
   const code = req.body.code;
   const clientId = firstDefined(req.body.client_id, req.body.clientId);
   const clientSecret = firstDefined(req.body.client_secret, req.body.clientSecret);

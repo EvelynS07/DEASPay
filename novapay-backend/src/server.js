@@ -29,28 +29,40 @@ const PORT = process.env.PORT || 3001;
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.NEXT_PUBLIC_APP_URL,
-  'https://deas-pay.vercel.app',
-  'https://evelyns07.github.io',
-]
-  .filter(Boolean)
-  .flatMap((value) => String(value).split(','))
-  .map((origin) => origin.trim().replace(/\/$/, ''))
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
   .filter(Boolean);
 
-app.options('*', cors());
+const defaultAllowedOrigins = [
+  'https://deas-pay.vercel.app',
+  'https://evelyns07.github.io',
+];
+
+const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultAllowedOrigins]));
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true; // curl, health checks e server-to-server
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return true;
+
+  try {
+    const url = new URL(origin);
+    // Permite previews/branches da Vercel do próprio projeto.
+    if (url.hostname === 'deas-pay.vercel.app' || url.hostname.endsWith('.vercel.app')) return true;
+  } catch {}
+
+  return false;
+}
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
-      return callback(null, true);
-    }
+    if (isAllowedCorsOrigin(origin)) return callback(null, true);
+    console.warn('CORS bloqueado para origem:', origin);
     return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(rateLimit({
@@ -83,7 +95,7 @@ app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     service: 'DEASPay API',
-    version: '1.1.0',
+    version: '1.1.1',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
   });
