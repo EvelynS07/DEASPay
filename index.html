@@ -1337,7 +1337,7 @@
   }
 
   // ===== API REAL / AUTH =====
-  const API_BASE = window.DEASPAY_API_BASE || localStorage.getItem('DEASPAY_API_BASE') || '';
+  const API_BASE = (window.DEASPAY_API_BASE || localStorage.getItem('DEASPAY_API_BASE') || 'https://deas-pay.vercel.app').replace(/\/$/, '');
 
   function getToken() { return localStorage.getItem('deaspay_token'); }
   function setSession(data) {

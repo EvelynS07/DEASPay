@@ -29,13 +29,24 @@ const PORT = process.env.PORT || 3001;
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-const allowedOrigins = (process.env.FRONTEND_URL || '*')
-  .split(',')
-  .map((origin) => origin.trim())
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.NEXT_PUBLIC_APP_URL,
+  'https://deas-pay.vercel.app',
+  'https://evelyns07.github.io',
+]
+  .filter(Boolean)
+  .flatMap((value) => String(value).split(','))
+  .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins.includes('*') ? true : allowedOrigins,
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
