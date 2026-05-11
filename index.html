@@ -488,6 +488,25 @@
   .of-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: var(--transition); }
   .of-toggle.on::after { left: calc(100% - 21px); }
 
+  .of-connected-grid { display: flex; flex-direction: column; gap: 14px; }
+  .of-connected-card { background: linear-gradient(135deg,#fff 0%,#fff7fa 100%); border: 1px solid rgba(242,96,138,0.18); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-card); }
+  .of-connected-top { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+  .of-connected-kicker { font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--rose-deep); font-weight: 700; margin-bottom: 4px; }
+  .of-connected-title { font-size: 18px; font-weight: 700; color: var(--black); display:flex; align-items:center; gap:8px; }
+  .of-connected-meta { margin-top: 8px; font-size: 12px; color: #8a8090; line-height: 1.5; }
+  .of-status-pill { display:inline-flex; align-items:center; gap:6px; border-radius: 999px; padding: 7px 12px; background: rgba(62,207,142,0.10); border:1px solid rgba(62,207,142,0.28); color:#21885c; font-size:12px; font-weight:700; white-space:nowrap; }
+  .of-revoke-btn { border: 1px solid rgba(224,92,110,0.28); background: rgba(224,92,110,0.08); color: var(--danger); border-radius: 12px; padding: 9px 13px; font-weight: 700; cursor:pointer; }
+  .of-metrics-grid { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin-top: 16px; }
+  .of-metric { background:#fff; border:1px solid rgba(13,10,11,0.07); border-radius:14px; padding:14px; min-height:74px; }
+  .of-metric-label { color: var(--gray-mid); text-transform:uppercase; letter-spacing:1px; font-size:10px; font-weight:800; margin-bottom:8px; }
+  .of-metric-value { color: var(--black); font-size:18px; font-weight:800; }
+  .of-permissions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .of-permission-chip { padding:7px 10px; border-radius:999px; background:var(--rose-pale); color:var(--rose-deep); font-size:12px; font-weight:600; }
+  .of-empty-connected { padding:18px; border-radius:var(--radius-sm); background:#fff7fa; color:#8a8090; border:1px dashed rgba(242,96,138,0.28); font-size:14px; }
+  @media (max-width: 900px) { .of-metrics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+  @media (max-width: 560px) { .of-metrics-grid { grid-template-columns: 1fr; } .of-connected-top { flex-direction:column; } }
+
+
   /* ===== PAGE: MINHA CONTA ===== */
   .profile-header { background: #fff; border-radius: var(--radius); border: 1px solid rgba(13,10,11,0.06); padding: 28px; display: flex; align-items: center; gap: 24px; margin-bottom: 20px; }
   .profile-avatar-lg { width: 76px; height: 76px; background: var(--gradient-btn); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 700; color: #fff; flex-shrink: 0; }
@@ -1157,10 +1176,19 @@
             <button class="of-btn-sec" onclick="loadOpenFinance(true)">Gerenciar consentimentos</button>
           </div>
         </div>
+        <div class="panel" style="margin-bottom:22px;">
+          <div class="panel-header"><div class="panel-title">Instituições conectadas</div></div>
+          <div class="panel-body">
+            <div class="of-connected-grid" id="of-connected-list">
+              <div class="of-empty-connected">Carregando conexões reais...</div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-header"><div class="panel-title">Pedir conexão aos bancos</div></div>
           <div class="panel-body">
-            <p style="color:#8a8090;margin-bottom:16px;font-size:14px;">Selecione uma instituição real abaixo para criar uma solicitação de consentimento. Bancos fictícios foram removidos.</p>
+            <p style="color:#8a8090;margin-bottom:16px;font-size:14px;">Selecione uma instituição real abaixo para abrir a autorização OAuth no banco parceiro. Instituições fictícias não aparecem mais.</p>
             <div id="of-request-status" style="display:none;margin-bottom:14px;padding:12px;border-radius:12px;background:#fff4f7;color:#9e3157;font-size:13px;"></div>
             <div class="of-institutions" id="of-institutions-list">
               <div class="of-institution-item">
@@ -1558,6 +1586,52 @@
     } catch {}
   }
 
+  function formatDateTime(value) {
+    if (!value) return 'Ainda não sincronizado';
+    try { return new Date(value).toLocaleString('pt-BR'); } catch { return '—'; }
+  }
+
+  function renderConnectedInstitutions(institutions) {
+    const connectedBox = document.getElementById('of-connected-list');
+    if (!connectedBox) return;
+    const connected = institutions.filter(inst => inst.consent_status === 'active');
+    if (!connected.length) {
+      connectedBox.innerHTML = `<div class="of-empty-connected">Nenhuma instituição conectada ainda. Peça conexão ao Deas Finance abaixo para trazer saldo, limite, score, renda e inadimplências reais.</div>`;
+      return;
+    }
+
+    connectedBox.innerHTML = connected.map(inst => `
+      <div class="of-connected-card">
+        <div class="of-connected-top">
+          <div>
+            <div class="of-connected-kicker">Instituição conectada</div>
+            <div class="of-connected-title"><span>${inst.logo_emoji || '🏦'}</span>${inst.name}</div>
+            <div class="of-connected-meta">Consentimento válido até: ${formatDateTime(inst.expires_at)} · Última sincronização: ${formatDateTime(inst.last_sync_at)}</div>
+            ${inst.sync_error ? `<div class="of-connected-meta" style="color:var(--danger);">Erro na última sincronização: ${inst.sync_error}</div>` : ''}
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span class="of-status-pill">● Ativo</span>
+            ${inst.consent_db_id ? `<button class="of-revoke-btn" onclick="revokeConsent('${inst.consent_db_id}')">× Revogar</button>` : ''}
+          </div>
+        </div>
+        <div class="of-permissions">
+          <span class="of-permission-chip">Dados cadastrais</span>
+          <span class="of-permission-chip">Saldos</span>
+          <span class="of-permission-chip">Extrato</span>
+          <span class="of-permission-chip">Score</span>
+          <span class="of-permission-chip">Inadimplências</span>
+        </div>
+        <div class="of-metrics-grid">
+          <div class="of-metric"><div class="of-metric-label">Saldo externo</div><div class="of-metric-value">${money(inst.shared_balance || 0)}</div></div>
+          <div class="of-metric"><div class="of-metric-label">Dívidas</div><div class="of-metric-value">${money(inst.shared_debt || 0)}</div></div>
+          <div class="of-metric"><div class="of-metric-label">Limite</div><div class="of-metric-value">${money(inst.shared_limit || 0)}</div></div>
+          <div class="of-metric"><div class="of-metric-label">Score externo</div><div class="of-metric-value">${Number(inst.shared_score || 0) || '—'}</div></div>
+          <div class="of-metric"><div class="of-metric-label">Renda estimada</div><div class="of-metric-value">${money(inst.shared_income || 0)}</div></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
   async function loadOpenFinance(showStatus = false) {
     const box = document.getElementById('of-institutions-list');
     const status = document.getElementById('of-request-status');
@@ -1565,24 +1639,26 @@
     if (showStatus && status) { status.style.display = 'block'; status.textContent = 'Atualizando instituições...'; }
     try {
       const institutions = await apiFetch('/api/open-finance/institutions');
-      if (!institutions.length) {
-        box.innerHTML = `<div class="of-institution-item"><div class="of-inst-info"><div class="of-inst-name">Nenhum banco disponível</div><div class="of-inst-status">Cadastre bancos reais no seed ou no banco de dados.</div></div></div>`;
+      renderConnectedInstitutions(institutions);
+      const available = institutions.filter(inst => inst.consent_status !== 'active');
+      if (!available.length) {
+        box.innerHTML = `<div class="of-institution-item"><div class="of-inst-info"><div class="of-inst-name">Todas as instituições reais já estão conectadas</div><div class="of-inst-status">Use o botão sincronizar nos cards acima para atualizar dados.</div></div></div>`;
+        if (showStatus && status) { status.style.display = 'block'; status.textContent = 'Instituições atualizadas.'; }
         return;
       }
-      box.innerHTML = institutions.map(inst => {
-        const active = inst.consent_status === 'active';
-        return `<div class="of-institution-item">
+      box.innerHTML = available.map(inst => `
+        <div class="of-institution-item">
           <div class="of-inst-logo"><span style="font-size:22px">${inst.logo_emoji || '🏦'}</span></div>
           <div class="of-inst-info">
             <div class="of-inst-name">${inst.name}</div>
-            <div class="of-inst-status">${active ? `Conectado • saldo compartilhado ${money(inst.shared_balance || 0)}` : 'Disponível para solicitar conexão real via Open Finance'}</div>
+            <div class="of-inst-status">Disponível para autorização OAuth real. Você será enviado para o banco parceiro.</div>
           </div>
-          <button class="${active ? 'btn-outline' : 'btn-primary'}" style="width:auto;margin:0;min-width:150px" onclick="${active ? `syncInstitution('${inst.id}')` : `requestConsent('${inst.id}')`}">${active ? 'Sincronizar' : 'Pedir conexão'}</button>
-        </div>`;
-      }).join('');
+          <button class="btn-primary" style="width:auto;margin:0;min-width:150px" onclick="requestConsent('${inst.id}')">Pedir conexão</button>
+        </div>`).join('');
       if (showStatus && status) { status.style.display = 'block'; status.textContent = 'Instituições atualizadas.'; }
     } catch (err) {
       box.innerHTML = `<div class="of-institution-item"><div class="of-inst-info"><div class="of-inst-name">Erro ao carregar bancos</div><div class="of-inst-status">${err.message}</div></div></div>`;
+      renderConnectedInstitutions([]);
     }
   }
 
@@ -1592,11 +1668,26 @@
         method: 'POST',
         body: JSON.stringify({ institution_id: institutionId })
       });
+      if (result.redirect_url) {
+        window.location.href = result.redirect_url;
+        return;
+      }
       showMessage(result.message || 'Conexão solicitada/autorizada com sucesso.');
       await loadOpenFinance(true);
       await loadScore();
     } catch (err) {
       showMessage('Erro ao solicitar conexão: ' + err.message);
+    }
+  }
+
+  async function revokeConsent(consentId) {
+    try {
+      await apiFetch(`/api/open-finance/consent/${consentId}`, { method: 'DELETE' });
+      showMessage('Consentimento revogado.');
+      await loadOpenFinance(true);
+      await loadScore();
+    } catch (err) {
+      showMessage('Erro ao revogar: ' + err.message);
     }
   }
 

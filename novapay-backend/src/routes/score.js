@@ -17,6 +17,11 @@ const WEIGHTS = {
 const MAX_SCORE = 1000;
 
 export async function calculateAndSaveScore(userId) {
+  // Garante colunas usadas pelo Open Finance receptor em bancos que já tinham schema antigo.
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_score SMALLINT DEFAULT 0`).catch(() => {});
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_debt DECIMAL(15,2) DEFAULT 0`).catch(() => {});
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_income DECIMAL(15,2) DEFAULT 0`).catch(() => {});
+
   const [userRow, accountRows, debtRows, txRows, consentRows] = await Promise.all([
     query(`SELECT created_at FROM users WHERE id = $1`, [userId]),
     query(`SELECT balance, credit_limit, credit_used FROM accounts WHERE user_id = $1 AND is_active = true`, [userId]),
@@ -29,7 +34,7 @@ export async function calculateAndSaveScore(userId) {
       ORDER BY t.created_at DESC
       LIMIT 200
     `, [userId]),
-    query(`SELECT status FROM open_finance_consents WHERE user_id = $1`, [userId]),
+    query(`SELECT status, COALESCE(shared_score, 0) AS shared_score FROM open_finance_consents WHERE user_id = $1`, [userId]),
   ]);
 
   let paymentScore = 1.0;
@@ -80,7 +85,19 @@ export async function calculateAndSaveScore(userId) {
     inquiryScore * WEIGHTS.new_inquiries +
     openFinanceBonus;
 
-  const finalScore = Math.round(Math.min(1, rawScore) * MAX_SCORE);
+  const localScore = Math.round(Math.min(1, rawScore) * MAX_SCORE);
+
+  // Score externo influencia de verdade: 65% score local + 35% média dos scores externos.
+  // Assim, um banco parceiro com score alto ajuda; com score baixo derruba.
+  const externalScores = consentRows.rows
+    .filter((c) => c.status === 'active' && Number(c.shared_score || 0) > 0)
+    .map((c) => Number(c.shared_score));
+  const avgExternalScore = externalScores.length
+    ? externalScores.reduce((sum, value) => sum + value, 0) / externalScores.length
+    : 0;
+  const finalScore = externalScores.length
+    ? Math.round(localScore * 0.65 + avgExternalScore * 0.35)
+    : localScore;
 
   await query(`
     INSERT INTO credit_score_history (
@@ -100,6 +117,8 @@ export async function calculateAndSaveScore(userId) {
     },
     classification: getClassification(finalScore),
     open_finance_bonus: Math.round(openFinanceBonus * MAX_SCORE),
+    local_score: localScore,
+    external_score_average: Math.round(avgExternalScore || 0),
   };
 }
 

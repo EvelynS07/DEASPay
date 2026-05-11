@@ -342,6 +342,13 @@ async function migrate() {
       -- Dados compartilhados (snapshot do último sync)
       shared_balance    DECIMAL(15,2),
       shared_limit      DECIMAL(15,2),
+      shared_debt       DECIMAL(15,2) DEFAULT 0,
+      shared_income     DECIMAL(15,2) DEFAULT 0,
+      shared_score      SMALLINT DEFAULT 0,
+      provider_access_token  TEXT,
+      provider_refresh_token TEXT,
+      provider_payload       JSONB DEFAULT '{}',
+      provider_state         TEXT,
       last_sync_at      TIMESTAMPTZ,
       sync_error        TEXT,
       
@@ -356,6 +363,15 @@ async function migrate() {
       UNIQUE(user_id, institution_id)
     )
   `);
+
+  // Migração incremental para bancos já criados antes dessas colunas existirem.
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_debt DECIMAL(15,2) DEFAULT 0`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_income DECIMAL(15,2) DEFAULT 0`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS shared_score SMALLINT DEFAULT 0`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS provider_access_token TEXT`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS provider_refresh_token TEXT`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS provider_payload JSONB DEFAULT '{}'`);
+  await query(`ALTER TABLE open_finance_consents ADD COLUMN IF NOT EXISTS provider_state TEXT`);
 
 
 
