@@ -377,7 +377,7 @@ async function authenticateProviderToken(req, res, next) {
   try {
     const { rows } = await query(
       `SELECT oat.id, oat.user_id, oat.client_id, oat.scope, oat.expires_at, oat.revoked_at,
-              u.full_name, u.cpf, u.email, u.phone
+              u.full_name, u.cpf, u.email, u.phone, u.monthly_income
        FROM oauth_access_tokens oat
        JOIN users u ON u.id = oat.user_id
        WHERE oat.token = $1 AND u.is_active = true`,
@@ -493,6 +493,17 @@ router.get('/provider/accounts', authenticateProviderToken, async (req, res) => 
       createdAt: tx.created_at,
     }));
 
+    const totalAvailableBalance = accounts.reduce((sum, acc) => sum + acc.availableBalance, 0);
+    const totalCreditLimit = accounts.reduce((sum, acc) => sum + acc.creditLimit, 0);
+    const totalCreditUsed = accounts.reduce((sum, acc) => sum + acc.creditUsed, 0);
+    const totalDebtAmount = debts
+      .filter((debt) => debt.status !== 'paid')
+      .reduce((sum, debt) => sum + debt.currentAmount, 0);
+    const estimatedIncome = Number(req.providerAccess.monthly_income || 0);
+    const currentScore = Number(score?.score ?? score?.currentScore ?? score?.value ?? 0);
+
+    // Contrato compatível com Deas Finance e outros bancos:
+    // 1) mantém arrays detalhados; 2) expõe campos planos; 3) expõe summary.
     return res.json({
       ok: true,
       provider: 'DEASPay',
@@ -503,19 +514,39 @@ router.get('/provider/accounts', authenticateProviderToken, async (req, res) => 
         cpf: req.providerAccess.cpf,
         email: req.providerAccess.email,
         phone: req.providerAccess.phone,
+        estimatedIncome,
       },
+
+      // Campos planos usados pelo Deas Finance
+      availableBalance: totalAvailableBalance,
+      saldoDisponivel: totalAvailableBalance,
+      debt: totalDebtAmount,
+      totalDebt: totalDebtAmount,
+      limit: totalCreditLimit,
+      creditLimit: totalCreditLimit,
+      creditUsed: totalCreditUsed,
+      loans: 0,
+      investments: 0,
+      estimatedIncome,
+      income: estimatedIncome,
+      externalScore: currentScore,
+      creditScore: currentScore,
+
+      // Dados detalhados
+      account: accounts[0] || null,
       accounts,
       score,
       debts,
       inadimplencias: debts,
       transactions,
       summary: {
-        totalAvailableBalance: accounts.reduce((sum, acc) => sum + acc.availableBalance, 0),
-        totalCreditLimit: accounts.reduce((sum, acc) => sum + acc.creditLimit, 0),
-        totalDebtAmount: debts
-          .filter((debt) => debt.status !== 'paid')
-          .reduce((sum, debt) => sum + debt.currentAmount, 0),
+        totalAvailableBalance,
+        totalCreditLimit,
+        totalCreditUsed,
+        totalDebtAmount,
         blacklistedDebts: debts.filter((debt) => debt.isBlacklisted).length,
+        estimatedIncome,
+        externalScore: currentScore,
       },
     });
   } catch (err) {

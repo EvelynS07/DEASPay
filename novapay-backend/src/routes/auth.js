@@ -47,6 +47,10 @@ router.post('/register', registerValidators, async (req, res) => {
     const userId = uuidv4();
     const accountId = uuidv4();
     const passwordHash = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 12);
+    const declaredIncome = Number(monthly_income || 0);
+    const initialCreditLimit = declaredIncome > 0
+      ? Math.max(500, Math.min(25000, Math.round(declaredIncome * 1.2)))
+      : 1500;
 
     await withTransaction(async (client) => {
       // Cria usuário
@@ -72,8 +76,8 @@ router.post('/register', registerValidators, async (req, res) => {
         INSERT INTO accounts (
           id, user_id, account_number, account_type,
           balance, credit_limit, pix_key_cpf, pix_key_email
-        ) VALUES ($1,$2,$3,'corrente',0.00,0.00,$4,$5)
-      `, [accountId, userId, accountNumber, cpf, email]);
+        ) VALUES ($1,$2,$3,'corrente',0.00,$4,$5,$6)
+      `, [accountId, userId, accountNumber, initialCreditLimit, cpf, email]);
 
       // Score inicial zerado
       await client.query(`
