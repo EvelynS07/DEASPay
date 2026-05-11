@@ -1,9 +1,15 @@
 {
   "version": 2,
   "builds": [
-    { "src": "novapay-backend/src/server.js", "use": "@vercel/node" }
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "index.html", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "novapay-backend/src/server.js" }
+    { "src": "/api/(.*)", "dest": "/api/index.js" },
+    { "src": "/authorize", "dest": "/api/index.js" },
+    { "src": "/token", "dest": "/api/index.js" },
+    { "src": "/provider/(.*)", "dest": "/api/index.js" },
+    { "src": "/health", "dest": "/api/index.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

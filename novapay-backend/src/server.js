@@ -40,6 +40,8 @@ const allowedOrigins = [
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
+app.options('*', cors());
+
 app.use(cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
@@ -77,7 +79,7 @@ app.get('/', (req, res, next) => {
   return next();
 });
 
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({
     status: 'ok',
     service: 'DEASPay API',

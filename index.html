@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
 <title>DEASPay — Banco Digital</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -1337,7 +1339,10 @@
   }
 
   // ===== API REAL / AUTH =====
-  const API_BASE = (window.DEASPAY_API_BASE || localStorage.getItem('DEASPAY_API_BASE') || 'https://deas-pay.vercel.app').replace(/\/$/, '');
+  // API fixa do backend real do DEASPay.
+  // Não usa window.location nem localStorage para evitar chamar GitHub Pages e gerar HTTP 405.
+  localStorage.removeItem('DEASPAY_API_BASE');
+  const API_BASE = 'https://deas-pay.vercel.app';
 
   function getToken() { return localStorage.getItem('deaspay_token'); }
   function setSession(data) {
@@ -1354,15 +1359,16 @@
   function showMessage(message) { alert(message); }
 
   async function apiFetch(path, options = {}) {
+    const url = API_BASE + path;
     const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
-    const response = await fetch(API_BASE + path, { ...options, headers });
+    const response = await fetch(url, { ...options, headers });
     let data = null;
     try { data = await response.json(); } catch {}
     if (!response.ok) {
       const errorMsg = data?.error || data?.message || data?.errors?.[0]?.msg || `Erro HTTP ${response.status}`;
-      throw new Error(errorMsg);
+      throw new Error(errorMsg + ' | API: ' + url);
     }
     return data;
   }
